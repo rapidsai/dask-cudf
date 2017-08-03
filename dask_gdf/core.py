@@ -13,7 +13,7 @@ from dask.core import flatten
 from dask.compatibility import apply
 from dask.optimize import cull, fuse
 from dask.threaded import get as threaded_get
-from dask.utils import funcname
+from dask.utils import funcname, M
 from dask.dataframe.utils import raise_on_meta_error
 from dask.dataframe.core import Scalar
 
@@ -110,6 +110,42 @@ class _Frame(Base):
             be the first argument, and these will be passed *after*.
         """
         return map_partitions(func, self, *args, **kwargs)
+
+    def head(self, n=5, npartitions=1, compute=True):
+        """ First n rows of the dataset
+
+        Parameters
+        ----------
+        n : int, optional
+            The number of rows to return. Default is 5.
+        npartitions : int, optional
+            Elements are only taken from the first ``npartitions``, with a
+            default of 1. If there are fewer than ``n`` rows in the first
+            ``npartitions`` a warning will be raised and any found rows
+            returned. Pass -1 to use all partitions.
+        compute : bool, optional
+            Whether to compute the result, default is True.
+        """
+        if npartitions <= -1:
+            npartitions = self.npartitions
+        if npartitions > self.npartitions:
+            raise ValueError("only %d partitions, received "
+                             "%d" % (self.npartitions, npartitions))
+
+        name = 'head-%d-%d-%s' % (npartitions, n, self._name)
+
+        if npartitions > 1:
+            name_p = 'head-partial-%d-%s' % (n, self._name)
+            dsk = {(name_p, i): (M.head, (self._name, i), n)
+                   for i in range(npartitions)}
+            dsk[(name, 0)] = (M.head, (gd.concat, sorted(dsk)), n)
+        else:
+            dsk = {(name, 0): (M.head, (self._name, 0), n)}
+
+        res = new_dd_object(merge(self.dask, dsk), name, self._meta,
+                            (self.divisions[0], self.divisions[npartitions]))
+
+        return res.compute() if compute else res
 
 
 normalize_token.register(_Frame, lambda a: a._name)
