@@ -1,10 +1,13 @@
+import operator
 from uuid import uuid4
 from math import ceil
 
-import pygdf as gd
 import numpy as np
+import pandas as pd
+import pygdf as gd
+from toolz import merge
 
-from dask.base import Base
+from dask.base import Base, tokenize, normalize_token
 from dask.context import _globals
 from dask.core import flatten
 from dask.optimize import cull, fuse
@@ -66,8 +69,20 @@ class _Frame(Base):
         """Return number of partitions"""
         return len(self.divisions) - 1
 
+    @property
+    def index(self):
+        """Return dask Index instance"""
+        name = self._name + '-index'
+        dsk = {(name, i): (getattr, key, 'index')
+               for i, key in enumerate(self._keys())}
+        return Index(merge(dsk, self.dask), name,
+                     self._meta.index, self.divisions)
+
     def _keys(self):
         return [(self._name, i) for i in range(self.npartitions)]
+
+
+normalize_token.register(_Frame, lambda a: a._name)
 
 
 class DataFrame(_Frame):
@@ -81,6 +96,29 @@ class DataFrame(_Frame):
     def dtypes(self):
         return self._meta.dtypes
 
+    def __dir__(self):
+        o = set(dir(type(self)))
+        o.update(self.__dict__)
+        o.update(c for c in self.columns if
+                 (isinstance(c, pd.compat.string_types) and
+                  pd.compat.isidentifier(c)))
+        return list(o)
+
+    def __getattr__(self, key):
+        if key in self.columns:
+            return self[key]
+        raise AttributeError("'DataFrame' object has no attribute %r" % key)
+
+    def __getitem__(self, key):
+        if isinstance(key, str) and key in self.columns:
+            meta = self._meta[key]
+            name = 'getitem-%s' % tokenize(self, key)
+            dsk = {(name, i): (operator.getitem, (self._name, i), key)
+                   for i in range(self.npartitions)}
+            return Series(merge(self.dask, dsk), name, meta, self.divisions)
+
+        raise NotImplementedError("Indexing with %r" % key)
+
 
 class Series(_Frame):
     _partition_type = gd.Series
@@ -92,6 +130,10 @@ class Series(_Frame):
 
 class Index(Series):
     _partition_type = gd.index.Index
+
+    @property
+    def index(self):
+        raise AttributeError("'Index' object has no attribute 'index'")
 
 
 def splits_divisions_sorted_pygdf(df, chunksize):
