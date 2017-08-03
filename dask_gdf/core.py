@@ -5,7 +5,7 @@ from math import ceil
 import numpy as np
 import pandas as pd
 import pygdf as gd
-from toolz import merge
+from toolz import merge, partition_all
 
 from dask.base import Base, tokenize, normalize_token
 from dask.context import _globals
@@ -95,6 +95,9 @@ class _Frame(Base):
             return lambda self, other: map_partitions(op, other, self)
         else:
             return lambda self, other: map_partitions(op, self, other)
+
+    def __len__(self):
+        return reduction(self, len, np.sum, meta=int).compute()
 
     def map_partitions(self, func, *args, **kwargs):
         """ Apply Python function on each DataFrame partition.
@@ -285,7 +288,7 @@ def _get_return_type(meta):
         return Series
     elif isinstance(meta, gd.DataFrame):
         return DataFrame
-    elif isinstance(meta, gd.Index):
+    elif isinstance(meta, gd.index.Index):
         return Index
     return Scalar
 
@@ -371,3 +374,122 @@ def map_partitions(func, *args, **kwargs):
 
     dasks = [arg.dask for arg in args if isinstance(arg, (_Frame, Scalar))]
     return new_dd_object(merge(dsk, *dasks), name, meta, args[0].divisions)
+
+
+def reduction(args, chunk=None, aggregate=None, combine=None,
+              meta=None, token=None, chunk_kwargs=None,
+              aggregate_kwargs=None, combine_kwargs=None,
+              split_every=None, **kwargs):
+    """Generic tree reduction operation.
+
+    Parameters
+    ----------
+    args :
+        Positional arguments for the `chunk` function. All `dask.dataframe`
+        objects should be partitioned and indexed equivalently.
+    chunk : function [block-per-arg] -> block
+        Function to operate on each block of data
+    aggregate : function list-of-blocks -> block
+        Function to operate on the list of results of chunk
+    combine : function list-of-blocks -> block, optional
+        Function to operate on intermediate lists of results of chunk
+        in a tree-reduction. If not provided, defaults to aggregate.
+    $META
+    token : str, optional
+        The name to use for the output keys.
+    chunk_kwargs : dict, optional
+        Keywords for the chunk function only.
+    aggregate_kwargs : dict, optional
+        Keywords for the aggregate function only.
+    combine_kwargs : dict, optional
+        Keywords for the combine function only.
+    split_every : int, optional
+        Group partitions into groups of this size while performing a
+        tree-reduction. If set to False, no tree-reduction will be used,
+        and all intermediates will be concatenated and passed to ``aggregate``.
+        Default is 8.
+    kwargs :
+        All remaining keywords will be passed to ``chunk``, ``aggregate``, and
+        ``combine``.
+    """
+    if chunk_kwargs is None:
+        chunk_kwargs = dict()
+    if aggregate_kwargs is None:
+        aggregate_kwargs = dict()
+    chunk_kwargs.update(kwargs)
+    aggregate_kwargs.update(kwargs)
+
+    if combine is None:
+        if combine_kwargs:
+            raise ValueError("`combine_kwargs` provided with no `combine`")
+        combine = aggregate
+        combine_kwargs = aggregate_kwargs
+    else:
+        if combine_kwargs is None:
+            combine_kwargs = dict()
+        combine_kwargs.update(kwargs)
+
+    if not isinstance(args, (tuple, list)):
+        args = [args]
+
+    npartitions = set(arg.npartitions for arg in args
+                      if isinstance(arg, _Frame))
+    if len(npartitions) > 1:
+        raise ValueError("All arguments must have same number of partitions")
+    npartitions = npartitions.pop()
+
+    if split_every is None:
+        split_every = 8
+    elif split_every is False:
+        split_every = npartitions
+    elif split_every < 2 or not isinstance(split_every, int):
+        raise ValueError("split_every must be an integer >= 2")
+
+    token_key = tokenize(token or (chunk, aggregate), meta, args,
+                         chunk_kwargs, aggregate_kwargs, combine_kwargs,
+                         split_every)
+
+    # Chunk
+    a = '{0}-chunk-{1}'.format(token or funcname(chunk), token_key)
+    if len(args) == 1 and isinstance(args[0], _Frame) and not chunk_kwargs:
+        dsk = {(a, 0, i): (chunk, key)
+               for i, key in enumerate(args[0]._keys())}
+    else:
+        dsk = {(a, 0, i): (apply, chunk,
+                           [(x._name, i) if isinstance(x, _Frame)
+                            else x for x in args], chunk_kwargs)
+               for i in range(args[0].npartitions)}
+
+    # Combine
+    b = '{0}-combine-{1}'.format(token or funcname(combine), token_key)
+    k = npartitions
+    depth = 0
+    while k > split_every:
+        for part_i, inds in enumerate(partition_all(split_every, range(k))):
+            conc = (list, [(a, depth, i) for i in inds])
+            dsk[(b, depth + 1, part_i)] = (
+                    (apply, combine, [conc], combine_kwargs)
+                    if combine_kwargs else (combine, conc))
+        k = part_i + 1
+        a = b
+        depth += 1
+
+    # Aggregate
+    b = '{0}-agg-{1}'.format(token or funcname(aggregate), token_key)
+    conc = (list, [(a, depth, i) for i in range(k)])
+    if aggregate_kwargs:
+        dsk[(b, 0)] = (apply, aggregate, [conc], aggregate_kwargs)
+    else:
+        dsk[(b, 0)] = (aggregate, conc)
+
+    if meta is None:
+        meta_chunk = _emulate(apply, chunk, args, chunk_kwargs)
+        meta = _emulate(apply, aggregate, [[meta_chunk]],
+                        aggregate_kwargs)
+    meta = make_meta(meta)
+
+    for arg in args:
+        if isinstance(arg, _Frame):
+            dsk.update(arg.dask)
+
+    return new_dd_object(dsk, b, meta, (None, None))
