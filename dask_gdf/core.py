@@ -57,6 +57,10 @@ class _Frame(Base):
         self._meta = meta
         self.divisions = tuple(divisions)
 
+    def __repr__(self):
+        s = "<dask_gdf.%s | %d tasks | %d npartitions>"
+        return s % (type(self).__name__, len(self.dask), self.npartitions)
+
     @property
     def npartitions(self):
         """Return number of partitions"""
@@ -69,9 +73,21 @@ class _Frame(Base):
 class DataFrame(_Frame):
     _partition_type = gd.DataFrame
 
+    @property
+    def columns(self):
+        return self._meta.columns
+
+    @property
+    def dtypes(self):
+        return self._meta.dtypes
+
 
 class Series(_Frame):
     _partition_type = gd.Series
+
+    @property
+    def dtype(self):
+        return self._meta.dtype
 
 
 class Index(Series):
