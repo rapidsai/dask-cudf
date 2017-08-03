@@ -10,8 +10,12 @@ from toolz import merge
 from dask.base import Base, tokenize, normalize_token
 from dask.context import _globals
 from dask.core import flatten
+from dask.compatibility import apply
 from dask.optimize import cull, fuse
 from dask.threaded import get as threaded_get
+from dask.utils import funcname
+from dask.dataframe.utils import raise_on_meta_error
+from dask.dataframe.core import Scalar
 
 from .utils import make_meta
 
@@ -60,6 +64,9 @@ class _Frame(Base):
         self._meta = meta
         self.divisions = tuple(divisions)
 
+    def _keys(self):
+        return [(self._name, i) for i in range(self.npartitions)]
+
     def __repr__(self):
         s = "<dask_gdf.%s | %d tasks | %d npartitions>"
         return s % (type(self).__name__, len(self.dask), self.npartitions)
@@ -78,8 +85,31 @@ class _Frame(Base):
         return Index(merge(dsk, self.dask), name,
                      self._meta.index, self.divisions)
 
-    def _keys(self):
-        return [(self._name, i) for i in range(self.npartitions)]
+    @classmethod
+    def _get_unary_operator(cls, op):
+        return lambda self: map_partitions(op, self)
+
+    @classmethod
+    def _get_binary_operator(cls, op, inv=False):
+        if inv:
+            return lambda self, other: map_partitions(op, other, self)
+        else:
+            return lambda self, other: map_partitions(op, self, other)
+
+    def map_partitions(self, func, *args, **kwargs):
+        """ Apply Python function on each DataFrame partition.
+
+        Note that the index and divisions are assumed to remain unchanged.
+
+        Parameters
+        ----------
+        func : function
+            Function applied to each partition.
+        args, kwargs :
+            Arguments and keywords to pass to the function. The partition will
+            be the first argument, and these will be passed *after*.
+        """
+        return map_partitions(func, self, *args, **kwargs)
 
 
 normalize_token.register(_Frame, lambda a: a._name)
@@ -126,6 +156,12 @@ class Series(_Frame):
     @property
     def dtype(self):
         return self._meta.dtype
+
+
+for op in [operator.abs, operator.add, operator.eq, operator.gt, operator.ge,
+           operator.lt, operator.le, operator.mod, operator.mul, operator.ne,
+           operator.sub, operator.truediv, operator.floordiv]:
+    Series._bind_operator(op)
 
 
 class Index(Series):
@@ -205,6 +241,97 @@ def from_pygdf(data, npartitions=None, chunksize=None, sort=True, name=None):
     dsk = {(name, i): data[start:stop]
            for i, (start, stop) in enumerate(zip(splits[:-1], splits[1:]))}
 
-    if isinstance(data, gd.Series):
-        return Series(dsk, name, data, divisions)
-    return DataFrame(dsk, name, data, divisions)
+    return new_dd_object(dsk, name, data, divisions)
+
+
+def _get_return_type(meta):
+    if isinstance(meta, gd.Series):
+        return Series
+    elif isinstance(meta, gd.DataFrame):
+        return DataFrame
+    elif isinstance(meta, gd.Index):
+        return Index
+    return Scalar
+
+
+def new_dd_object(dsk, name, meta, divisions):
+    return _get_return_type(meta)(dsk, name, meta, divisions)
+
+
+def _extract_meta(x):
+    """
+    Extract internal cache data (``_meta``) from dask_gdf objects
+    """
+    if isinstance(x, (Scalar, _Frame)):
+        return x._meta
+    elif isinstance(x, list):
+        return [_extract_meta(_x) for _x in x]
+    elif isinstance(x, tuple):
+        return tuple([_extract_meta(_x) for _x in x])
+    elif isinstance(x, dict):
+        return {k: _extract_meta(v) for k, v in x.items()}
+    return x
+
+
+def _emulate(func, *args, **kwargs):
+    """
+    Apply a function using args / kwargs. If arguments contain dd.DataFrame /
+    dd.Series, using internal cache (``_meta``) for calculation
+    """
+    with raise_on_meta_error(funcname(func)):
+        return func(*_extract_meta(args), **_extract_meta(kwargs))
+
+
+def align_partitions(args):
+    """Align partitions between dask_gdf objects.
+
+    Note that if all divisions are unknown, but have equal npartitions, then
+    they will be passed through unchanged."""
+    dfs = [df for df in args if isinstance(df, _Frame)]
+    if not dfs:
+        return args
+
+    divisions = dfs[0].divisions
+    if not all(df.divisions == divisions for df in dfs):
+        raise NotImplementedError("Aligning mismatched partitions")
+    return args
+
+
+def map_partitions(func, *args, **kwargs):
+    """ Apply Python function on each DataFrame partition.
+
+    Parameters
+    ----------
+    func : function
+        Function applied to each partition.
+    args, kwargs :
+        Arguments and keywords to pass to the function. At least one of the
+        args should be a dask_gdf object.
+    """
+    meta = kwargs.pop('meta', None)
+    if meta is not None:
+        meta = make_meta(meta)
+
+    if 'token' in kwargs:
+        name = kwargs.pop('token')
+        token = tokenize(meta, *args, **kwargs)
+    else:
+        name = funcname(func)
+        token = tokenize(func, meta, *args, **kwargs)
+    name = '{0}-{1}'.format(name, token)
+
+    args = align_partitions(args)
+
+    if meta is None:
+        meta = _emulate(func, *args, **kwargs)
+    meta = make_meta(meta)
+
+    dfs = [df for df in args if isinstance(df, _Frame)]
+    dsk = {}
+    for i in range(dfs[0].npartitions):
+        values = [(x._name, i if isinstance(x, _Frame) else 0)
+                  if isinstance(x, (_Frame, Scalar)) else x for x in args]
+        dsk[(name, i)] = (apply, func, values, kwargs)
+
+    dasks = [arg.dask for arg in args if isinstance(arg, (_Frame, Scalar))]
+    return new_dd_object(merge(dsk, *dasks), name, meta, args[0].divisions)

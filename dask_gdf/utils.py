@@ -29,7 +29,7 @@ def make_meta(x):
     if hasattr(x, '_meta'):
         return x._meta
     if isinstance(x, (gd.Series, gd.DataFrame, gd.index.Index)):
-        out = x[:1]
+        out = x[:2]
         return out.copy() if hasattr(out, 'copy') else out
 
     meta = dd.utils.make_meta(x)
@@ -37,11 +37,10 @@ def make_meta(x):
     if isinstance(meta, (pd.DataFrame, pd.Series, pd.Index)):
         meta2 = dd.utils.meta_nonempty(meta)
         if isinstance(meta2, pd.DataFrame):
-            return gd.DataFrame.from_pandas(meta2.iloc[:1])
+            return gd.DataFrame.from_pandas(meta2)
         elif isinstance(meta2, pd.Series):
-            return gd.Series.from_any(meta2.iloc[:1])
+            return gd.Series.from_any(meta2)
         else:
-            meta2 = meta2[:1]
             if isinstance(meta2, pd.RangeIndex):
                 return gd.index.RangeIndex(meta2.start, meta2.stop)
             return gd.index.GenericIndex(meta2)
