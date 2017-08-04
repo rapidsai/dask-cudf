@@ -5,6 +5,7 @@ from math import ceil
 import numpy as np
 import pandas as pd
 import pygdf as gd
+from libgdf_cffi import libgdf
 from toolz import merge, partition_all
 
 from dask.base import Base, tokenize, normalize_token
@@ -189,12 +190,60 @@ class DataFrame(_Frame):
         raise NotImplementedError("Indexing with %r" % key)
 
 
+def sum_of_squares(x):
+    x = x.astype('f8')
+    return gd._gdf.apply_reduce(libgdf.gdf_sum_squared_generic, x)
+
+
+def var_aggregate(x2, x, n, ddof=1):
+    try:
+        result = (x2 / n) - (x / n)**2
+        if ddof != 0:
+            result = result * n / (n - ddof)
+        return result
+    except ZeroDivisionError:
+        return np.float64(np.nan)
+
+
 class Series(_Frame):
     _partition_type = gd.Series
 
     @property
     def dtype(self):
         return self._meta.dtype
+
+    def sum(self, split_every=None):
+        return reduction(self, chunk=M.sum, aggregate=np.sum,
+                         split_every=split_every, meta=self.dtype)
+
+    def count(self, split_every=None):
+        return reduction(self, chunk=M.count, aggregate=np.sum,
+                         split_every=split_every, meta='i8')
+
+    def mean(self, split_every=None):
+        sum = self.sum(split_every=split_every)
+        n = self.count(split_every=split_every)
+        return sum / n
+
+    def var(self, ddof=1, split_every=None):
+        sum2 = reduction(self, chunk=sum_of_squares, aggregate=np.sum,
+                         split_every=split_every, meta='f8')
+        sum = self.sum(split_every=split_every)
+        n = self.count(split_every=split_every)
+        return map_partitions(var_aggregate, sum2, sum, n, ddof=ddof,
+                              meta='f8')
+
+    def std(self, ddof=1, split_every=None):
+        var = self.var(ddof=ddof, split_every=split_every)
+        return map_partitions(np.sqrt, var, dtype=np.float64)
+
+    def min(self, split_every=None):
+        return reduction(self, chunk=M.min, aggregate=np.min,
+                         split_every=split_every, meta=self.dtype)
+
+    def max(self, split_every=None):
+        return reduction(self, chunk=M.max, aggregate=np.max,
+                         split_every=split_every, meta=self.dtype)
 
 
 for op in [operator.abs, operator.add, operator.eq, operator.gt, operator.ge,
@@ -364,6 +413,11 @@ def map_partitions(func, *args, **kwargs):
     if meta is None:
         meta = _emulate(func, *args, **kwargs)
     meta = make_meta(meta)
+
+    if all(isinstance(arg, Scalar) for arg in args):
+        dask = {(name, 0):
+                (apply, func, (tuple, [(x._name, 0) for x in args]), kwargs)}
+        return Scalar(merge(dask, *[x.dask for x in args]), name, meta)
 
     dfs = [df for df in args if isinstance(df, _Frame)]
     dsk = {}
