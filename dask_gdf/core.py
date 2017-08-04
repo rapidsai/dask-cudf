@@ -220,6 +220,11 @@ class Series(_Frame):
     def dtype(self):
         return self._meta.dtype
 
+    def astype(self, dtype):
+        if dtype == self.dtype:
+            return self
+        return self.map_partitions(M.astype, dtype=dtype)
+
     def sum(self, split_every=None):
         return reduction(self, chunk=M.sum, aggregate=np.sum,
                          split_every=split_every, meta=self.dtype)
