@@ -69,6 +69,12 @@ class _Frame(Base):
     def _keys(self):
         return [(self._name, i) for i in range(self.npartitions)]
 
+    def __getstate__(self):
+        return (self.dask, self._name, self._meta, self.divisions)
+
+    def __setstate__(self, state):
+        self.dask, self._name, self._meta, self.divisions = state
+
     def __repr__(self):
         s = "<dask_gdf.%s | %d tasks | %d npartitions>"
         return s % (type(self).__name__, len(self.dask), self.npartitions)
