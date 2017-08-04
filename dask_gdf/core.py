@@ -245,6 +245,12 @@ class Series(_Frame):
         return reduction(self, chunk=M.max, aggregate=np.max,
                          split_every=split_every, meta=self.dtype)
 
+    def ceil(self):
+        return self.map_partitions(M.ceil)
+
+    def floor(self):
+        return self.map_partitions(M.floor)
+
 
 for op in [operator.abs, operator.add, operator.eq, operator.gt, operator.ge,
            operator.lt, operator.le, operator.mod, operator.mul, operator.ne,
