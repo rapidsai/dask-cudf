@@ -213,6 +213,10 @@ def nsmallest_agg(x, **kwargs):
     return gd.concat(x).nsmallest(**kwargs)
 
 
+def unique_k_agg(x, **kwargs):
+    return gd.concat(x).unique_k(**kwargs)
+
+
 class Series(_Frame):
     _partition_type = gd.Series
 
@@ -273,6 +277,11 @@ class Series(_Frame):
         return reduction(self, chunk=M.nsmallest, aggregate=nsmallest_agg,
                          meta=self._meta, token='series-nsmallest',
                          split_every=split_every, n=n)
+
+    def unique_k(self, k, split_every=None):
+        return reduction(self, chunk=M.unique_k, aggregate=unique_k_agg,
+                         meta=self._meta, token='unique-k',
+                         split_every=split_every, k=k)
 
 
 for op in [operator.abs, operator.add, operator.eq, operator.gt, operator.ge,
