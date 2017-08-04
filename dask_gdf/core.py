@@ -98,7 +98,8 @@ class _Frame(Base):
             return lambda self, other: map_partitions(op, self, other)
 
     def __len__(self):
-        return reduction(self, len, np.sum, meta=int).compute()
+        return reduction(self, len, np.sum, meta=int,
+                         split_every=False).compute()
 
     def map_partitions(self, func, *args, **kwargs):
         """ Apply Python function on each DataFrame partition.
@@ -229,20 +230,20 @@ class Series(_Frame):
             return self
         return self.map_partitions(M.astype, dtype=dtype)
 
-    def sum(self, split_every=None):
+    def sum(self, split_every=False):
         return reduction(self, chunk=M.sum, aggregate=np.sum,
                          split_every=split_every, meta=self.dtype)
 
-    def count(self, split_every=None):
+    def count(self, split_every=False):
         return reduction(self, chunk=M.count, aggregate=np.sum,
                          split_every=split_every, meta='i8')
 
-    def mean(self, split_every=None):
+    def mean(self, split_every=False):
         sum = self.sum(split_every=split_every)
         n = self.count(split_every=split_every)
         return sum / n
 
-    def var(self, ddof=1, split_every=None):
+    def var(self, ddof=1, split_every=False):
         sum2 = reduction(self, chunk=sum_of_squares, aggregate=np.sum,
                          split_every=split_every, meta='f8')
         sum = self.sum(split_every=split_every)
@@ -250,15 +251,15 @@ class Series(_Frame):
         return map_partitions(var_aggregate, sum2, sum, n, ddof=ddof,
                               meta='f8')
 
-    def std(self, ddof=1, split_every=None):
+    def std(self, ddof=1, split_every=False):
         var = self.var(ddof=ddof, split_every=split_every)
         return map_partitions(np.sqrt, var, dtype=np.float64)
 
-    def min(self, split_every=None):
+    def min(self, split_every=False):
         return reduction(self, chunk=M.min, aggregate=np.min,
                          split_every=split_every, meta=self.dtype)
 
-    def max(self, split_every=None):
+    def max(self, split_every=False):
         return reduction(self, chunk=M.max, aggregate=np.max,
                          split_every=split_every, meta=self.dtype)
 
