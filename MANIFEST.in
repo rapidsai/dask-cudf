@@ -1,0 +1,6 @@
+recursive-include dask_gdf *.py
+include versioneer.py
+include setup.py
+include README.rst
+include LICENSE.txt
+include MANIFEST.in
