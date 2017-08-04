@@ -205,6 +205,14 @@ def var_aggregate(x2, x, n, ddof=1):
         return np.float64(np.nan)
 
 
+def nlargest_agg(x, **kwargs):
+    return gd.concat(x).nlargest(**kwargs)
+
+
+def nsmallest_agg(x, **kwargs):
+    return gd.concat(x).nsmallest(**kwargs)
+
+
 class Series(_Frame):
     _partition_type = gd.Series
 
@@ -250,6 +258,16 @@ class Series(_Frame):
 
     def floor(self):
         return self.map_partitions(M.floor)
+
+    def nlargest(self, n=5, split_every=None):
+        return reduction(self, chunk=M.nlargest, aggregate=nlargest_agg,
+                         meta=self._meta, token='series-nlargest',
+                         split_every=split_every, n=n)
+
+    def nsmallest(self, n=5, split_every=None):
+        return reduction(self, chunk=M.nsmallest, aggregate=nsmallest_agg,
+                         meta=self._meta, token='series-nsmallest',
+                         split_every=split_every, n=n)
 
 
 for op in [operator.abs, operator.add, operator.eq, operator.gt, operator.ge,
