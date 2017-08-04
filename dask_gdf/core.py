@@ -319,6 +319,11 @@ class Series(_Frame):
     def floor(self):
         return self.map_partitions(M.floor)
 
+    def fillna(self, value):
+        if not np.can_cast(value, self.dtype):
+            raise TypeError("fill value must match dtype of series")
+        return self.map_partitions(M.fillna, value, meta=self)
+
     def nlargest(self, n=5, split_every=None):
         return reduction(self, chunk=M.nlargest, aggregate=nlargest_agg,
                          meta=self._meta, token='series-nlargest',
