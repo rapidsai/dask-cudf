@@ -156,6 +156,17 @@ class _Frame(Base):
 normalize_token.register(_Frame, lambda a: a._name)
 
 
+def query(df, expr, callenv):
+    boolmask = gd.queryutils.query_execute(df, expr, callenv)
+
+    selected = gd.Series.from_array(boolmask)
+    newdf = gd.DataFrame()
+    for col in df.columns:
+        newseries = df[col][selected]
+        newdf[col] = newseries
+    return newdf
+
+
 class DataFrame(_Frame):
     _partition_type = gd.DataFrame
 
@@ -189,6 +200,31 @@ class DataFrame(_Frame):
             return Series(merge(self.dask, dsk), name, meta, self.divisions)
 
         raise NotImplementedError("Indexing with %r" % key)
+
+    def query(self, expr):
+        """Query with a boolean expression using Numba to compile a GPU kernel.
+
+        See pandas.DataFrame.query.
+
+        Parameters
+        ----------
+        expr : str
+            A boolean expression.  Names in the expression refers to the
+            columns.
+
+        Returns
+        -------
+        filtered :  DataFrame
+        """
+        if "@" in expr:
+            raise NotImplementedError("Using variables from the calling "
+                                      "environment")
+        # Empty calling environment
+        callenv = {
+            'locals': {},
+            'globals': {},
+        }
+        return self.map_partitions(query, expr, callenv, meta=self._meta)
 
 
 def sum_of_squares(x):
