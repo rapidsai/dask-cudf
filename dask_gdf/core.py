@@ -8,6 +8,7 @@ import pygdf as gd
 from libgdf_cffi import libgdf
 from toolz import merge, partition_all
 
+import dask.dataframe as dd
 from dask.base import Base, tokenize, normalize_token
 from dask.context import _globals
 from dask.core import flatten
@@ -151,6 +152,13 @@ class _Frame(Base):
                             (self.divisions[0], self.divisions[npartitions]))
 
         return res.compute() if compute else res
+
+    def to_dask_dataframe(self):
+        """Create a dask.dataframe object from a dask_gdf object"""
+        meta = self._meta.to_pandas()
+        dummy = self.map_partitions(M.to_pandas, meta=self._meta)
+        return dd.core.new_dd_object(dummy.dask, dummy._name, meta,
+                                     dummy.divisions)
 
 
 normalize_token.register(_Frame, lambda a: a._name)
@@ -405,6 +413,27 @@ def from_pygdf(data, npartitions=None, chunksize=None, sort=True, name=None):
            for i, (start, stop) in enumerate(zip(splits[:-1], splits[1:]))}
 
     return new_dd_object(dsk, name, data, divisions)
+
+
+def _from_pandas(df):
+    return gd.DataFrame.from_pandas(df)
+
+
+def from_dask_dataframe(df):
+    """Create a `dask_gdf.DataFrame` from a `dask.dataframe.DataFrame`
+
+    Parameters
+    ----------
+    df : dask.dataframe.DataFrame
+    """
+    bad_cols = df.select_dtypes(include=['O', 'M', 'm'])
+    if len(bad_cols.columns):
+        raise ValueError("Object, datetime, or timedelta dtypes aren't "
+                         "supported by pygdf")
+
+    meta = _from_pandas(df._meta)
+    dummy = DataFrame(df.dask, df._name, meta, df.divisions)
+    return dummy.map_partitions(_from_pandas, meta=meta)
 
 
 def _get_return_type(meta):
