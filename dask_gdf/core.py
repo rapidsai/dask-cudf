@@ -173,7 +173,7 @@ normalize_token.register(_Frame, lambda a: a._name)
 def query(df, expr, callenv):
     boolmask = gd.queryutils.query_execute(df, expr, callenv)
 
-    selected = gd.Series.from_array(boolmask)
+    selected = gd.Series(boolmask)
     newdf = gd.DataFrame()
     for col in df.columns:
         newseries = df[col][selected]
