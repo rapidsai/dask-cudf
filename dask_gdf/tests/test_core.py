@@ -39,3 +39,13 @@ def test_query():
     expect = gdf.query(expr).to_pandas()
 
     assert_frame_equal(got, expect)
+
+
+def test_head():
+    np.random.seed(0)
+    df = pd.DataFrame({'x': np.random.randint(0, 5, size=100),
+                       'y': np.random.normal(size=100)})
+    gdf = gd.DataFrame.from_pandas(df)
+    dgf = dgd.from_pygdf(gdf, npartitions=2)
+
+    assert_frame_equal(dgf.head().to_pandas(), df.head())
