@@ -242,8 +242,9 @@ class DataFrame(_Frame):
 
 
 def sum_of_squares(x):
-    x = x.astype('f8')
-    return gd._gdf.apply_reduce(libgdf.gdf_sum_squared_generic, x)
+    x = x.astype('f8')._column
+    outcol = gd._gdf.apply_reduce(libgdf.gdf_sum_squared_generic, x)
+    return gd.Series(outcol)
 
 
 def var_aggregate(x2, x, n, ddof=1):
