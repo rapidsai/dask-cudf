@@ -4,6 +4,7 @@ from pandas.util.testing import assert_frame_equal
 
 import pygdf as gd
 import dask_gdf as dgd
+import dask.dataframe as dd
 
 
 def test_from_pygdf():
@@ -49,3 +50,17 @@ def test_head():
     dgf = dgd.from_pygdf(gdf, npartitions=2)
 
     assert_frame_equal(dgf.head().to_pandas(), df.head())
+
+
+def test_from_dask_dataframe():
+    np.random.seed(0)
+    df = pd.DataFrame({'x': np.random.randint(0, 5, size=20),
+                       'y': np.random.normal(size=20)})
+    ddf = dd.from_pandas(df, npartitions=2)
+    dgdf = dgd.from_dask_dataframe(ddf)
+    got = dgdf.compute().to_pandas()
+    expect = df
+    # Should the index be matching?
+    assert (got.index != expect.index).any()
+    np.testing.assert_array_equal(got.x.values, expect.x.values)
+    np.testing.assert_array_equal(got.y.values, expect.y.values)
