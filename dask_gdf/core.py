@@ -173,7 +173,7 @@ normalize_token.register(_Frame, lambda a: a._name)
 def query(df, expr, callenv):
     boolmask = gd.queryutils.query_execute(df, expr, callenv)
 
-    selected = gd.Series.from_array(boolmask)
+    selected = gd.Series(boolmask)
     newdf = gd.DataFrame()
     for col in df.columns:
         newseries = df[col][selected]
@@ -242,8 +242,9 @@ class DataFrame(_Frame):
 
 
 def sum_of_squares(x):
-    x = x.astype('f8')
-    return gd._gdf.apply_reduce(libgdf.gdf_sum_squared_generic, x)
+    x = x.astype('f8')._column
+    outcol = gd._gdf.apply_reduce(libgdf.gdf_sum_squared_generic, x)
+    return gd.Series(outcol)
 
 
 def var_aggregate(x2, x, n, ddof=1):
