@@ -71,6 +71,44 @@ def test_append():
     assert_frame_equal(df, appended.compute().to_pandas())
 
 
+def test_series_concat():
+    np.random.seed(0)
+
+    n = 1000
+    df = pd.DataFrame({'x': np.random.randint(0, 5, size=n),
+                       'y': np.random.normal(size=n)})
+
+    gdf = gd.DataFrame.from_pandas(df)
+    frags = _fragmented_gdf(gdf, nsplit=13)
+
+    frags = [df.x for df in frags]
+
+    concated = dgd.concat(frags).compute().to_pandas()
+    assert isinstance(concated, pd.Series)
+    np.testing.assert_array_equal(concated, df.x)
+
+
+def test_series_append():
+    np.random.seed(0)
+
+    n = 1000
+    df = pd.DataFrame({'x': np.random.randint(0, 5, size=n),
+                       'y': np.random.normal(size=n)})
+
+    gdf = gd.DataFrame.from_pandas(df)
+    frags = _fragmented_gdf(gdf, nsplit=13)
+
+    frags = [df.x for df in frags]
+
+    appending = dgd.from_pygdf(frags[0], npartitions=1)
+    for frag in frags[1:]:
+        appending = appending.append(frag)
+
+    appended = appending.compute().to_pandas()
+    assert isinstance(appended, pd.Series)
+    np.testing.assert_array_equal(appended, df.x)
+
+
 def test_query():
     np.random.seed(0)
 
