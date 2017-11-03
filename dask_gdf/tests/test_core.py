@@ -24,6 +24,53 @@ def test_from_pygdf():
     assert_frame_equal(ddf.compute(), df)
 
 
+def _fragmented_gdf(df, nsplit):
+    n = len(df)
+
+    # Split dataframe in *nsplit*
+    subdivsize = n // nsplit
+    starts = [i * subdivsize for i in range(nsplit)]
+    ends = starts[1:] + [None]
+    frags = [df[s:e] for s, e in zip(starts, ends)]
+    return frags
+
+
+def test_concat():
+    np.random.seed(0)
+
+    n = 1000
+    df = pd.DataFrame({'x': np.random.randint(0, 5, size=n),
+                       'y': np.random.normal(size=n)})
+
+    gdf = gd.DataFrame.from_pandas(df)
+    frags = _fragmented_gdf(gdf, nsplit=13)
+
+    # Combine with concat
+    concated = dgd.concat(frags)
+    assert_frame_equal(df, concated.compute().to_pandas())
+
+
+def test_append():
+    np.random.seed(0)
+
+    n = 1000
+    df = pd.DataFrame({'x': np.random.randint(0, 5, size=n),
+                       'y': np.random.normal(size=n)})
+
+    gdf = gd.DataFrame.from_pandas(df)
+    frags = _fragmented_gdf(gdf, nsplit=13)
+
+    # Combine with .append
+    head = frags[0]
+    tail = frags[1:]
+
+    appended = dgd.from_pygdf(head, npartitions=1)
+    for each in tail:
+        appended = appended.append(each)
+
+    assert_frame_equal(df, appended.compute().to_pandas())
+
+
 def test_query():
     np.random.seed(0)
 
