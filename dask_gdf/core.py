@@ -19,7 +19,7 @@ from dask.utils import funcname, M
 from dask.dataframe.utils import raise_on_meta_error
 from dask.dataframe.core import Scalar
 
-from .utils import make_meta
+from .utils import make_meta, check_meta
 
 
 def optimize(dsk, keys, **kwargs):
@@ -478,6 +478,52 @@ def from_pygdf(data, npartitions=None, chunksize=None, sort=True, name=None):
 
 def _from_pandas(df):
     return gd.DataFrame.from_pandas(df)
+
+
+def from_delayed(dfs, meta=None, prefix='from_delayed'):
+    """ Create Dask DataFrame from many Dask Delayed objects
+    Parameters
+    ----------
+    dfs : list of Delayed
+        An iterable of ``dask.delayed.Delayed`` objects, such as come from
+        ``dask.delayed`` These comprise the individual partitions of the
+        resulting dataframe.
+    meta : pygdf.DataFrame, pygdf.Series, or pygdf.Index
+        An empty pygdf object with names, dtypes, and indices matching the
+        expected output.
+    prefix : str, optional
+        Prefix to prepend to the keys.
+    """
+    from dask.delayed import Delayed, delayed
+
+    if isinstance(dfs, Delayed):
+        dfs = [dfs]
+
+    dfs = [delayed(df)
+           if not isinstance(df, Delayed) and hasattr(df, 'key')
+           else df
+           for df in dfs]
+
+    for df in dfs:
+            if not isinstance(df, Delayed):
+                raise TypeError("Expected Delayed object, got {}".format(
+                                type(df).__name__))
+
+    if meta is None:
+        meta = dfs[0].compute()
+    meta = make_meta(meta)
+
+    name = prefix + '-' + tokenize(*dfs)
+
+    dsk = merge(df.dask for df in dfs)
+    dsk.update({(name, i): (check_meta, df.key, meta, 'from_delayed')
+                for (i, df) in enumerate(dfs)})
+
+    divs = [None] * (len(dfs) + 1)
+    df = new_dd_object(dsk, name, meta, divs)
+
+    return df
+
 
 
 def from_dask_dataframe(df):
