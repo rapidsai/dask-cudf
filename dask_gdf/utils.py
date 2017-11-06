@@ -49,11 +49,11 @@ def make_meta(x):
     return meta
 
 
-
 def check_meta(x, meta, funcname=None):
     """Check that the dask metadata matches the result.
     If metadata matches, ``x`` is passed through unchanged. A nice error is
     raised if metadata doesn't match.
+
     Parameters
     ----------
     x : DataFrame, Series, or Index
