@@ -166,6 +166,55 @@ class _Frame(Base):
         return dd.core.new_dd_object(dummy.dask, dummy._name, meta,
                                      dummy.divisions)
 
+    def append(self, other):
+        """Add rows from *other*
+        """
+        return concat([self, other])
+
+
+def _daskify(obj):
+    """Convert input to a dask-gdf object.
+    """
+    if isinstance(obj, _Frame):
+        return obj
+    elif isinstance(obj, (pd.DataFrame, pd.Series, pd.Index)):
+        return dd.from_pandas(obj, npartitions=1)
+    elif isinstance(obj, (gd.DataFrame, gd.Series, gd.index.Index)):
+        return from_pygdf(obj, npartitions=1)
+    elif isinstance(obj, (dd.DataFrame, dd.Series, dd.Index)):
+        return from_dask_dataframe(obj)
+    else:
+        raise TypeError("type {} is not supported".format(type(obj)))
+
+
+def concat(objs):
+    """Concantenate dask gdf objects
+
+    Parameters
+    ----------
+
+    objs : sequence of DataFrame, Series, Index
+        A sequence of objects to be concatenated.
+    """
+    objs = [_daskify(x) for x in objs]
+    meta = gd.concat(_extract_meta(objs))
+
+    name = "concat-" + uuid4().hex
+    dsk = {}
+    divisions = [0]
+    base = 0
+    lastdiv = 0
+    for obj in objs:
+        for k, i in obj._keys():
+            dsk[name, base + i] = k, i
+        base += obj.npartitions
+        divisions.extend([d + lastdiv for d in obj.divisions[1:]])
+        lastdiv = obj.divisions[-1]
+
+    dasks = [o.dask for o in objs]
+    dsk = merge(dsk, *dasks)
+    return new_dd_object(dsk, name, meta, divisions)
+
 
 normalize_token.register(_Frame, lambda a: a._name)
 
@@ -356,7 +405,7 @@ class Index(Series):
 
 
 def splits_divisions_sorted_pygdf(df, chunksize):
-    segments = df.index.find_segments()
+    segments = list(df.index.find_segments())
     segments.append(len(df) - 1)
 
     splits = [0]
