@@ -166,6 +166,10 @@ class _Frame(Base):
         return dd.core.new_dd_object(dummy.dask, dummy._name, meta,
                                      dummy.divisions)
 
+    def to_delayed(self):
+        """See dask_gdf.to_delayed docstring for more information."""
+        return to_delayed(self)
+
     def append(self, other):
         """Add rows from *other*
         """
@@ -481,7 +485,7 @@ def _from_pandas(df):
 
 
 def from_delayed(dfs, meta=None, prefix='from_delayed'):
-    """ Create Dask DataFrame from many Dask Delayed objects
+    """ Create Dask GDF DataFrame from many Dask Delayed objects
     Parameters
     ----------
     dfs : list of Delayed
@@ -524,6 +528,16 @@ def from_delayed(dfs, meta=None, prefix='from_delayed'):
 
     return df
 
+
+def to_delayed(df):
+    """ Create Dask Delayed objects from a Dask GDF Dataframe
+    Returns a list of delayed values, one value per partition.
+    """
+    from dask.delayed import Delayed
+
+    keys = df._keys()
+    dsk = df._optimize(df.dask, keys)
+    return [Delayed(k, dsk) for k in keys]
 
 
 def from_dask_dataframe(df):
