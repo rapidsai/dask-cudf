@@ -4,6 +4,8 @@ Test IO with dask.delayed API
 import numpy as np
 from pandas.util.testing import assert_frame_equal
 
+import pytest
+
 import pygdf as gd
 import dask_gdf as dgd
 from dask.delayed import delayed
@@ -100,4 +102,69 @@ def test_series_to_delayed():
         expect = sr[s:e].to_pandas()
         got = part.compute().to_pandas()
         np.testing.assert_array_equal(got, expect)
+
+
+def test_mixing_series_frame_error():
+    nelem = 20
+
+    df = gd.DataFrame()
+    df['x'] = np.arange(nelem)
+    df['y'] = np.random.randint(nelem, size=nelem)
+
+    ddf = dgd.from_pygdf(df, npartitions=5)
+
+    delay_frame = ddf.to_delayed()
+    delay_series = ddf.x.to_delayed()
+    combined = dgd.from_delayed(delay_frame + delay_series)
+
+    with pytest.raises(ValueError) as raises:
+        out = combined.compute()
+
+    raises.match(r"^Metadata mismatch found in `from_delayed`.")
+    raises.match(r"Expected partition of type `DataFrame` but got `Series`")
+
+
+def test_frame_extra_columns_error():
+    nelem = 20
+
+    df = gd.DataFrame()
+    df['x'] = np.arange(nelem)
+    df['y'] = np.random.randint(nelem, size=nelem)
+    ddf1 = dgd.from_pygdf(df, npartitions=5)
+
+    df['z'] = np.arange(nelem)
+    ddf2 = dgd.from_pygdf(df, npartitions=5)
+
+    combined = dgd.from_delayed(ddf1.to_delayed() + ddf2.to_delayed())
+
+    with pytest.raises(ValueError) as raises:
+        out = combined.compute()
+
+    raises.match(r"^Metadata mismatch found in `from_delayed`.")
+    raises.match(r"extra columns")
+
+
+def test_frame_dtype_error():
+    nelem = 20
+
+    df1 = gd.DataFrame()
+    df1['bad'] = np.arange(nelem)
+    df1['bad'] = np.arange(nelem, dtype=np.float64)
+
+    df2 = gd.DataFrame()
+    df2['bad'] = np.arange(nelem)
+    df2['bad'] = np.arange(nelem, dtype=np.float32)
+
+
+    ddf1 = dgd.from_pygdf(df1, npartitions=5)
+    ddf2 = dgd.from_pygdf(df2, npartitions=5)
+
+    combined = dgd.from_delayed(ddf1.to_delayed() + ddf2.to_delayed())
+
+    with pytest.raises(ValueError) as raises:
+        out = combined.compute()
+
+    print("out")
+    raises.match(r"^Metadata mismatch found in `from_delayed`.")
+    raises.match(r"\s+\|\s+".join(['bad', 'float32', 'float64']))
 
