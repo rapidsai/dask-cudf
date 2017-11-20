@@ -268,6 +268,26 @@ class DataFrame(_Frame):
 
         raise NotImplementedError("Indexing with %r" % key)
 
+    def assign(self, **kwargs):
+        if not kwargs:
+            return self
+
+        for k, v in kwargs.items():
+            if not isinstance(v, Series):
+                msg = 'cannot column {!r} of type: {}'
+                raise TypeError(msg.format(k, type(v)))
+
+        def assigner(df, *args):
+            out = df.copy()
+            for k, v in zip(args, args[1:]):
+                out.add_column(k, v)
+            return out
+
+        pairs = list(sum(kwargs.items(), ()))
+        k1, v1 = pairs[:2]
+        meta = assigner(self._meta, k1, make_meta(v1))
+        return self.map_partitions(assigner, *pairs, meta=meta)
+
     def query(self, expr):
         """Query with a boolean expression using Numba to compile a GPU kernel.
 

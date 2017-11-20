@@ -149,3 +149,19 @@ def test_from_dask_dataframe():
     assert (got.index != expect.index).any()
     np.testing.assert_array_equal(got.x.values, expect.x.values)
     np.testing.assert_array_equal(got.y.values, expect.y.values)
+
+
+def test_assign():
+    np.random.seed(0)
+    df = pd.DataFrame({'x': np.random.randint(0, 5, size=20),
+                       'y': np.random.normal(size=20)})
+
+    dgf = dgd.from_pygdf(gd.DataFrame.from_pandas(df), npartitions=2)
+    pdcol = pd.Series(np.arange(20) + 1000)
+    newcol = dgd.from_pygdf(gd.Series(pdcol),
+                            npartitions=dgf.npartitions)
+    out = dgf.assign(z=newcol)
+
+    got = out.compute().to_pandas()
+    assert_frame_equal(got.loc[:, ['x', 'y']], df)
+    np.testing.assert_array_equal(got['z'], pdcol)
