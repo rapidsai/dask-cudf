@@ -1,6 +1,7 @@
 import pandas as pd
 import pygdf as gd
 import dask.dataframe as dd
+from dask.utils import asciitable
 
 
 def make_meta(x):
@@ -46,3 +47,68 @@ def make_meta(x):
             return gd.index.GenericIndex(meta2)
 
     return meta
+
+
+def check_meta(x, meta, funcname=None):
+    """Check that the dask metadata matches the result.
+    If metadata matches, ``x`` is passed through unchanged. A nice error is
+    raised if metadata doesn't match.
+
+    Parameters
+    ----------
+    x : DataFrame, Series, or Index
+    meta : DataFrame, Series, or Index
+        The expected metadata that ``x`` should match
+    funcname : str, optional
+        The name of the function in which the metadata was specified. If
+        provided, the function name will be included in the error message to be
+        more helpful to users.
+    """
+
+    if not isinstance(meta, (gd.Series, gd.index.Index, gd.DataFrame)):
+        raise TypeError("Expected partition to be DataFrame, Series, or "
+                        "Index of pygdf, got `%s`" % type(meta).__name__)
+
+    if type(x) != type(meta):
+        errmsg = ("Expected partition of type `%s` but got "
+                  "`%s`" % (type(meta).__name__, type(x).__name__))
+    elif isinstance(meta, gd.DataFrame):
+
+        extra_cols = set(x.columns) ^ set(meta.columns)
+        if extra_cols:
+            errmsg = "extra columns"
+        else:
+            bad = [(col, x[col].dtype, meta[col].dtype) for col in x.columns
+                   if not series_type_eq(x[col], meta[col])]
+
+            if not bad:
+                return x
+            errmsg = ("Partition type: `%s`\n%s" %
+                      (type(meta).__name__,
+                       asciitable(['Column', 'Found', 'Expected'], bad)))
+    else:
+        if series_type_eq(x, meta):
+            return x
+
+        errmsg = ("Partition type: `%s`\n%s" %
+                  (type(meta).__name__,
+                   asciitable(['', 'dtype'], [('Found', x.dtype),
+                                              ('Expected', meta.dtype)])))
+
+    raise ValueError("Metadata mismatch found%s.\n\n"
+                     "%s" % ((" in `%s`" % funcname if funcname else ""),
+                             errmsg))
+
+
+def series_type_eq(a, b):
+    """Are the two Series type equivalent?
+
+    Parameters
+    ----------
+    a, b : pygdf.Series
+
+    Returns
+    -------
+    res : boolean
+    """
+    return a._column.is_type_equivalent(b._column)
