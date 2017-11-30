@@ -145,10 +145,26 @@ def test_from_dask_dataframe():
     dgdf = dgd.from_dask_dataframe(ddf)
     got = dgdf.compute().to_pandas()
     expect = df
-    # Should the index be matching?
-    assert (got.index != expect.index).any()
+
+    np.testing.assert_array_equal(got.index.values, expect.index.values)
     np.testing.assert_array_equal(got.x.values, expect.x.values)
     np.testing.assert_array_equal(got.y.values, expect.y.values)
+
+
+def test_set_index():
+    np.random.seed(0)
+    nelem = 20
+    df = pd.DataFrame({'x': np.random.randint(0, 5, size=nelem),
+                       'y': np.random.normal(size=nelem)})
+    ddf = dd.from_pandas(df, npartitions=2)
+    dgdf = dgd.from_dask_dataframe(ddf)
+
+    expect = ddf.set_index('x').compute()
+    got = dgdf.set_index('x').compute().to_pandas()
+
+    np.testing.assert_array_equal(got.index.values, expect.index.values)
+    np.testing.assert_array_equal(got.y.values, expect.y.values)
+    assert got.columns == expect.columns
 
 
 def test_assign():

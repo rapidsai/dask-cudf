@@ -313,6 +313,11 @@ class DataFrame(_Frame):
         }
         return self.map_partitions(query, expr, callenv, meta=self._meta)
 
+    def set_index(self, indexname, drop=True, sorted=False):
+        ddf = self.to_dask_dataframe()
+        ddf = ddf.set_index(indexname, drop=drop, sorted=sorted)
+        return from_dask_dataframe(ddf)
+
 
 def sum_of_squares(x):
     x = x.astype('f8')._column
