@@ -2,6 +2,8 @@ import numpy as np
 import pandas as pd
 from pandas.util.testing import assert_frame_equal
 
+import pytest
+
 import pygdf as gd
 import dask_gdf as dgd
 import dask.dataframe as dd
@@ -151,11 +153,16 @@ def test_from_dask_dataframe():
     np.testing.assert_array_equal(got.y.values, expect.y.values)
 
 
-def test_set_index():
-    np.random.seed(0)
+@pytest.mark.parametrize('seed', list(range(5)))
+def test_set_index(seed):
+    np.random.seed(seed)
     nelem = 20
-    df = pd.DataFrame({'x': np.random.randint(0, 5, size=nelem),
-                       'y': np.random.normal(size=nelem)})
+
+    # Use unique index range as the sort may not be stable-ordering
+    x = np.arange(nelem)
+    np.random.shuffle(x)
+    df = pd.DataFrame({'x': x,
+                       'y': np.random.randint(0, nelem, size=nelem)})
     ddf = dd.from_pandas(df, npartitions=2)
     dgdf = dgd.from_dask_dataframe(ddf)
 
