@@ -18,6 +18,8 @@ from dask.threaded import get as threaded_get
 from dask.utils import funcname, M
 from dask.dataframe.utils import raise_on_meta_error
 from dask.dataframe.core import Scalar
+from dask.delayed import delayed
+from dask import compute
 
 from .utils import make_meta, check_meta
 
@@ -176,15 +178,16 @@ class _Frame(Base):
         return concat([self, other])
 
 
-def _daskify(obj):
+def _daskify(obj, npartitions=None, chunksize=None):
     """Convert input to a dask-gdf object.
     """
+    npartitions = npartitions or 1
     if isinstance(obj, _Frame):
         return obj
     elif isinstance(obj, (pd.DataFrame, pd.Series, pd.Index)):
-        return dd.from_pandas(obj, npartitions=1)
+        return _daskify(dd.from_pandas(obj, npartitions=npartitions))
     elif isinstance(obj, (gd.DataFrame, gd.Series, gd.index.Index)):
-        return from_pygdf(obj, npartitions=1)
+        return from_pygdf(obj, npartitions=npartitions)
     elif isinstance(obj, (dd.DataFrame, dd.Series, dd.Index)):
         return from_dask_dataframe(obj)
     else:
@@ -317,6 +320,89 @@ class DataFrame(_Frame):
         ddf = self.to_dask_dataframe()
         ddf = ddf.set_index(indexname, drop=drop, sorted=sorted)
         return from_dask_dataframe(ddf)
+
+    def reset_index(self):
+        dfs = self.to_delayed()
+        sizes = np.asarray(compute(*map(delayed(len), dfs)))
+        prefixes = np.zeros_like(sizes)
+        prefixes[1:] = np.cumsum(sizes[:-1])
+
+        @delayed
+        def fix_index(df, startpos):
+            return df.set_index(np.arange(start=startpos,
+                                          stop=startpos + len(df),
+                                          dtype=np.intp))
+
+        outdfs = [fix_index(df, startpos)
+                  for df, startpos in zip(dfs, prefixes)]
+        return from_delayed(outdfs)
+
+    def take(self, indices, npartitions=None, chunksize=None):
+        """Take elements from the positional indices.
+
+        Parameters
+        ----------
+        indices : Series
+
+        Note
+        ----
+        Difference from pandas:
+            * We reset the index to 0..N to maintain the property that
+              the indices must be sorted.
+
+        """
+        indices = _daskify(indices, npartitions=npartitions,
+                           chunksize=chunksize)
+
+        def get_parts(idxs, divs):
+            parts = [p for i in idxs
+                       for p, (s, e) in enumerate(zip(divs, divs[1:]))
+                       if s <= i and i < e]
+            return parts
+
+        @delayed
+        def partition(sr, divs):
+            return sorted(frozenset(get_parts(sr.to_array(), divs)))
+
+        # get parts
+        divs = self.divisions
+        sridx = indices.to_delayed()
+        partsel = compute(*(partition(sr, divs) for sr in sridx))
+
+        parts = self.to_delayed()
+        grouped_parts = [tuple(parts[j] for j in sel)
+                         for sel in partsel]
+
+        # compute sizes of each partition
+        sizes = compute(*map(delayed(len), parts))
+        prefixes = np.zeros_like(sizes)
+        prefixes[1:] = np.cumsum(sizes)[:-1]
+
+        # shuffle them
+
+        @delayed
+        def shuffle(sr, prefixes, divs, *deps):
+            idxs = sr.to_array()
+            parts = np.asarray(get_parts(idxs, divs))
+
+            partdfs = []
+            for p, df in zip(sorted(frozenset(parts)), deps):
+                cond = parts == p
+                valididxs = idxs[cond]
+                ordering = np.arange(len(idxs))[cond]
+                selected = valididxs - prefixes[p]
+                sel = df.take(selected).set_index(ordering)
+                partdfs.append(sel)
+
+            joined = gd.concat(partdfs).sort_index()
+            return joined
+
+        shuffled = [shuffle(sr, prefixes, divs, *deps)
+                    for sr, deps in zip(sridx, grouped_parts)]
+        out = from_delayed(shuffled)
+
+        out = out.reset_index()
+        return out
 
 
 def sum_of_squares(x):

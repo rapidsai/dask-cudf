@@ -174,6 +174,33 @@ def test_set_index(seed):
     assert got.columns == expect.columns
 
 
+
+@pytest.mark.parametrize('nelem,nparts', [(10, 1),
+                                          (100, 10),
+                                          (1000, 10)])
+def test_take(nelem, nparts):
+    np.random.seed(0)
+
+    # # Use unique index range as the sort may not be stable-ordering
+    x = np.random.randint(0, nelem, size=nelem)
+    y = np.random.random(nelem)
+
+    selected = np.random.randint(0, nelem - 1, size=nelem // 2)
+
+    df = pd.DataFrame({'x': x, 'y': y})
+
+    ddf = dd.from_pandas(df, npartitions=nparts)
+    dgdf = dgd.from_dask_dataframe(ddf)
+    out = dgdf.take(gd.Series(selected), npartitions=5)
+    got = out.compute().to_pandas()
+
+    expect = df.take(selected)
+    assert 1 < out.npartitions <= 5
+    np.testing.assert_array_equal(got.index, np.arange(len(got)))
+    np.testing.assert_array_equal(got.x, expect.x)
+    np.testing.assert_array_equal(got.y, expect.y)
+
+
 def test_assign():
     np.random.seed(0)
     df = pd.DataFrame({'x': np.random.randint(0, 5, size=20),
