@@ -174,6 +174,27 @@ def test_set_index(seed):
     assert got.columns == expect.columns
 
 
+@pytest.mark.parametrize('nelem', [10, 100, 1000])
+def test_set_index_2(nelem):
+    np.random.seed(0)
+    df = pd.DataFrame({'x': 100 + np.random.randint(0, nelem//2, size=nelem),
+                       'y': np.random.normal(size=nelem)})
+    expect = df.set_index('x').sort_index()
+
+    dgf = dgd.from_pygdf(gd.DataFrame.from_pandas(df), npartitions=4)
+    res = dgf.set_index('x')  # sort by default
+    got = res.compute().to_pandas()
+
+    assert sorted(set(got.index)) == sorted(set(expect.index))
+    unique_values = sorted(set(got.index))
+    for iv in unique_values:
+        sr_expect = expect.loc[[iv]]
+        sr_got = got.loc[[iv]]
+
+        sorted_expect = sr_expect.sort_values('y')
+        sorted_got = sr_got.sort_values('y')
+        np.testing.assert_array_equal(sorted_expect, sorted_got)
+
 
 @pytest.mark.parametrize('nelem,nparts', [(10, 1),
                                           (100, 10),

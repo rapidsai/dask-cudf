@@ -317,9 +317,18 @@ class DataFrame(_Frame):
         return self.map_partitions(query, expr, callenv, meta=self._meta)
 
     def set_index(self, indexname, drop=True, sorted=False):
-        ddf = self.to_dask_dataframe()
-        ddf = ddf.set_index(indexname, drop=drop, sorted=sorted)
-        return from_dask_dataframe(ddf)
+        assert drop
+        assert not sorted
+
+        # Get subset with just the index and positional value
+        subset = self[indexname].to_dask_dataframe()
+        subset = subset.reset_index(drop=False)
+        ordered = subset.set_index(0)
+        shufidx = from_dask_dataframe(ordered)['index']
+        # Shuffle the GPU data
+        shuffled = self.take(shufidx, npartitions=self.npartitions)
+        out = shuffled.map_partitions(lambda df: df.set_index(indexname))
+        return out
 
     def reset_index(self):
         dfs = self.to_delayed()
@@ -357,7 +366,7 @@ class DataFrame(_Frame):
         def get_parts(idxs, divs):
             parts = [p for i in idxs
                        for p, (s, e) in enumerate(zip(divs, divs[1:]))
-                       if s <= i and i < e]
+                       if s <= i and (i < e or e == divs[-1])]
             return parts
 
         @delayed
@@ -379,7 +388,6 @@ class DataFrame(_Frame):
         prefixes[1:] = np.cumsum(sizes)[:-1]
 
         # shuffle them
-
         @delayed
         def shuffle(sr, prefixes, divs, *deps):
             idxs = sr.to_array()
