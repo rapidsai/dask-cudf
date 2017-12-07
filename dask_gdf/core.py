@@ -272,6 +272,15 @@ class DataFrame(_Frame):
         raise NotImplementedError("Indexing with %r" % key)
 
     def assign(self, **kwargs):
+        """Add columns to the dataframe.
+
+        Parameters
+        ----------
+        **kwargs : dict
+            The keys are used for the column names.
+            The values are Series for the new column.
+        """
+        # Empty assign
         if not kwargs:
             return self
 
@@ -316,14 +325,37 @@ class DataFrame(_Frame):
         }
         return self.map_partitions(query, expr, callenv, meta=self._meta)
 
-    def set_index(self, indexname, drop=True, sorted=False):
-        assert drop
-        assert not sorted
+    def set_index(self, index, drop=True, sorted=False):
+        """Set new index.
 
+        Parameters
+        ----------
+        index : str or Series
+            If a ``str`` is provided, it is used as the name of the
+            column to be made into the index.
+            If a ``Series`` is provided, it is used as the new index
+        drop : bool
+            Whether the first original index column is dropped.
+        sorted : bool
+            Whether the new index column is already sorted.
+        """
+        if not drop:
+            raise NotImplementedError('drop=False not supported yet')
+
+        if isinstance(index, str):
+            return self._set_index_raw(index, drop=drop, sorted=sorted)
+        elif isinstance(index, Series):
+            indexname = '__dask_gdf.index'
+            df = self.assign(**{indexname: index})
+            return df._set_index_raw(indexname, drop=drop, sorted=sorted)
+        else:
+            raise TypeError('cannot set_index from {}'.format(type(index)))
+
+    def _set_index_raw(self, indexname, drop, sorted):
         # Get subset with just the index and positional value
         subset = self[indexname].to_dask_dataframe()
         subset = subset.reset_index(drop=False)
-        ordered = subset.set_index(0)
+        ordered = subset.set_index(0, sorted=sorted)
         shufidx = from_dask_dataframe(ordered)['index']
         # Shuffle the GPU data
         shuffled = self.take(shufidx, npartitions=self.npartitions)
@@ -331,6 +363,8 @@ class DataFrame(_Frame):
         return out
 
     def reset_index(self):
+        """Reset index to range based
+        """
         dfs = self.to_delayed()
         sizes = np.asarray(compute(*map(delayed(len), dfs)))
         prefixes = np.zeros_like(sizes)

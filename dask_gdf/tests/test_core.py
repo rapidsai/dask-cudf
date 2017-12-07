@@ -153,11 +153,9 @@ def test_from_dask_dataframe():
     np.testing.assert_array_equal(got.y.values, expect.y.values)
 
 
-@pytest.mark.parametrize('seed', list(range(5)))
-def test_set_index(seed):
-    np.random.seed(seed)
-    nelem = 20
-
+@pytest.mark.parametrize('nelem', [10, 200, 1333])
+def test_set_index(nelem):
+    np.random.seed(0)
     # Use unique index range as the sort may not be stable-ordering
     x = np.arange(nelem)
     np.random.shuffle(x)
@@ -174,7 +172,23 @@ def test_set_index(seed):
     assert got.columns == expect.columns
 
 
-@pytest.mark.parametrize('nelem', [10, 100, 1000])
+def assert_frame_equal_by_index_group(expect, got):
+    assert sorted(expect.columns) == sorted(got.columns)
+    assert sorted(set(got.index)) == sorted(set(expect.index))
+    # Note the set_index sort is not stable,
+    unique_values = sorted(set(got.index))
+    for iv in unique_values:
+        sr_expect = expect.loc[[iv]]
+        sr_got = got.loc[[iv]]
+
+        for k in expect.columns:
+            # Sort each column before we compare them
+            sorted_expect = sr_expect.sort_values(k)[k]
+            sorted_got = sr_got.sort_values(k)[k]
+            np.testing.assert_array_equal(sorted_expect, sorted_got)
+
+
+@pytest.mark.parametrize('nelem', [10, 200, 1333])
 def test_set_index_2(nelem):
     np.random.seed(0)
     df = pd.DataFrame({'x': 100 + np.random.randint(0, nelem//2, size=nelem),
@@ -185,15 +199,22 @@ def test_set_index_2(nelem):
     res = dgf.set_index('x')  # sort by default
     got = res.compute().to_pandas()
 
-    assert sorted(set(got.index)) == sorted(set(expect.index))
-    unique_values = sorted(set(got.index))
-    for iv in unique_values:
-        sr_expect = expect.loc[[iv]]
-        sr_got = got.loc[[iv]]
+    assert_frame_equal_by_index_group(expect, got)
 
-        sorted_expect = sr_expect.sort_values('y')
-        sorted_got = sr_got.sort_values('y')
-        np.testing.assert_array_equal(sorted_expect, sorted_got)
+
+def test_set_index_w_series():
+    nelem = 20
+    np.random.seed(0)
+    df = pd.DataFrame({'x': 100 + np.random.randint(0, nelem//2, size=nelem),
+                       'y': np.random.normal(size=nelem)})
+    expect = df.set_index(df.x).sort_index()
+
+    dgf = dgd.from_pygdf(gd.DataFrame.from_pandas(df), npartitions=4)
+    res = dgf.set_index(dgf.x)  # sort by default
+    got = res.compute().to_pandas()
+
+    assert set(expect.columns) == set(got.columns)
+    assert_frame_equal_by_index_group(expect, got)
 
 
 @pytest.mark.parametrize('nelem,nparts', [(10, 1),
