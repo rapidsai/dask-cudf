@@ -2,6 +2,8 @@ import numpy as np
 import pandas as pd
 from pandas.util.testing import assert_frame_equal
 
+import pytest
+
 import pygdf as gd
 import dask_gdf as dgd
 import dask.dataframe as dd
@@ -145,7 +147,113 @@ def test_from_dask_dataframe():
     dgdf = dgd.from_dask_dataframe(ddf)
     got = dgdf.compute().to_pandas()
     expect = df
-    # Should the index be matching?
-    assert (got.index != expect.index).any()
+
+    np.testing.assert_array_equal(got.index.values, expect.index.values)
     np.testing.assert_array_equal(got.x.values, expect.x.values)
     np.testing.assert_array_equal(got.y.values, expect.y.values)
+
+
+@pytest.mark.parametrize('nelem', [10, 200, 1333])
+def test_set_index(nelem):
+    np.random.seed(0)
+    # Use unique index range as the sort may not be stable-ordering
+    x = np.arange(nelem)
+    np.random.shuffle(x)
+    df = pd.DataFrame({'x': x,
+                       'y': np.random.randint(0, nelem, size=nelem)})
+    ddf = dd.from_pandas(df, npartitions=2)
+    dgdf = dgd.from_dask_dataframe(ddf)
+
+    expect = ddf.set_index('x').compute()
+    got = dgdf.set_index('x').compute().to_pandas()
+
+    np.testing.assert_array_equal(got.index.values, expect.index.values)
+    np.testing.assert_array_equal(got.y.values, expect.y.values)
+    assert got.columns == expect.columns
+
+
+def assert_frame_equal_by_index_group(expect, got):
+    assert sorted(expect.columns) == sorted(got.columns)
+    assert sorted(set(got.index)) == sorted(set(expect.index))
+    # Note the set_index sort is not stable,
+    unique_values = sorted(set(got.index))
+    for iv in unique_values:
+        sr_expect = expect.loc[[iv]]
+        sr_got = got.loc[[iv]]
+
+        for k in expect.columns:
+            # Sort each column before we compare them
+            sorted_expect = sr_expect.sort_values(k)[k]
+            sorted_got = sr_got.sort_values(k)[k]
+            np.testing.assert_array_equal(sorted_expect, sorted_got)
+
+
+@pytest.mark.parametrize('nelem', [10, 200, 1333])
+def test_set_index_2(nelem):
+    np.random.seed(0)
+    df = pd.DataFrame({'x': 100 + np.random.randint(0, nelem//2, size=nelem),
+                       'y': np.random.normal(size=nelem)})
+    expect = df.set_index('x').sort_index()
+
+    dgf = dgd.from_pygdf(gd.DataFrame.from_pandas(df), npartitions=4)
+    res = dgf.set_index('x')  # sort by default
+    got = res.compute().to_pandas()
+
+    assert_frame_equal_by_index_group(expect, got)
+
+
+def test_set_index_w_series():
+    nelem = 20
+    np.random.seed(0)
+    df = pd.DataFrame({'x': 100 + np.random.randint(0, nelem//2, size=nelem),
+                       'y': np.random.normal(size=nelem)})
+    expect = df.set_index(df.x).sort_index()
+
+    dgf = dgd.from_pygdf(gd.DataFrame.from_pandas(df), npartitions=4)
+    res = dgf.set_index(dgf.x)  # sort by default
+    got = res.compute().to_pandas()
+
+    assert set(expect.columns) == set(got.columns)
+    assert_frame_equal_by_index_group(expect, got)
+
+
+@pytest.mark.parametrize('nelem,nparts', [(10, 1),
+                                          (100, 10),
+                                          (1000, 10)])
+def test_take(nelem, nparts):
+    np.random.seed(0)
+
+    # # Use unique index range as the sort may not be stable-ordering
+    x = np.random.randint(0, nelem, size=nelem)
+    y = np.random.random(nelem)
+
+    selected = np.random.randint(0, nelem - 1, size=nelem // 2)
+
+    df = pd.DataFrame({'x': x, 'y': y})
+
+    ddf = dd.from_pandas(df, npartitions=nparts)
+    dgdf = dgd.from_dask_dataframe(ddf)
+    out = dgdf.take(gd.Series(selected), npartitions=5)
+    got = out.compute().to_pandas()
+
+    expect = df.take(selected)
+    assert 1 < out.npartitions <= 5
+    np.testing.assert_array_equal(got.index, np.arange(len(got)))
+    np.testing.assert_array_equal(got.x, expect.x)
+    np.testing.assert_array_equal(got.y, expect.y)
+
+
+def test_assign():
+    np.random.seed(0)
+    df = pd.DataFrame({'x': np.random.randint(0, 5, size=20),
+                       'y': np.random.normal(size=20)})
+
+    dgf = dgd.from_pygdf(gd.DataFrame.from_pandas(df), npartitions=2)
+    pdcol = pd.Series(np.arange(20) + 1000)
+    newcol = dgd.from_pygdf(gd.Series(pdcol),
+                            npartitions=dgf.npartitions)
+    out = dgf.assign(z=newcol)
+
+    got = out.compute().to_pandas()
+    assert_frame_equal(got.loc[:, ['x', 'y']], df)
+    np.testing.assert_array_equal(got['z'], pdcol)
