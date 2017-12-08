@@ -325,6 +325,11 @@ class DataFrame(_Frame):
         }
         return self.map_partitions(query, expr, callenv, meta=self._meta)
 
+    def groupby(self, by):
+        from .groupby import Groupby
+
+        return Groupby(df=self, by=by)
+
     def set_index(self, index, drop=True, sorted=False):
         """Set new index.
 
@@ -351,12 +356,23 @@ class DataFrame(_Frame):
         else:
             raise TypeError('cannot set_index from {}'.format(type(index)))
 
-    def _set_index_raw(self, indexname, drop, sorted):
+    def _argsort(self, col, sorted=False):
+        """
+        Returns
+        -------
+        shufidx : Series
+            Positional indices to be used with .take() to
+            put the dataframe in order w.r.t ``col``.
+        """
         # Get subset with just the index and positional value
-        subset = self[indexname].to_dask_dataframe()
+        subset = self[col].to_dask_dataframe()
         subset = subset.reset_index(drop=False)
         ordered = subset.set_index(0, sorted=sorted)
         shufidx = from_dask_dataframe(ordered)['index']
+        return shufidx
+
+    def _set_index_raw(self, indexname, drop, sorted):
+        shufidx = self._argsort(indexname, sorted=sorted)
         # Shuffle the GPU data
         shuffled = self.take(shufidx, npartitions=self.npartitions)
         out = shuffled.map_partitions(lambda df: df.set_index(indexname))
@@ -379,6 +395,16 @@ class DataFrame(_Frame):
         outdfs = [fix_index(df, startpos)
                   for df, startpos in zip(dfs, prefixes)]
         return from_delayed(outdfs)
+
+    def sort_value(self, col):
+        """Sort by the given column
+
+        Parameter
+        ---------
+        col : str
+        """
+        shufidx = self._argsort(col)
+        return self.take(shufidx)
 
     def take(self, indices, npartitions=None, chunksize=None):
         """Take elements from the positional indices.
@@ -410,6 +436,10 @@ class DataFrame(_Frame):
         # get parts
         divs = self.divisions
         sridx = indices.to_delayed()
+        # drop empty partitions in sridx
+        sridx_sizes = compute(*map(delayed(len), sridx))
+        sridx = [sr for sr, n in zip(sridx, sridx_sizes) if n > 0]
+        # compute partitioning
         partsel = compute(*(partition(sr, divs) for sr in sridx))
 
         parts = self.to_delayed()
