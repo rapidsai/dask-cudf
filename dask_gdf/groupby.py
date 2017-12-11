@@ -9,6 +9,8 @@ from .core import from_delayed
 
 
 class Groupby(object):
+    """The object returned by ``df.groupby()``.
+    """
     def __init__(self, df, by):
         self._df = df
         self._by = tuple([by]) if isinstance(by, str) else tuple(by)
@@ -22,14 +24,18 @@ class Groupby(object):
         then cached for future use.
         """
         if self._grouped_cache is None:
-            self._grouped_cache = self._do_group()
+            self._grouped_cache = self._do_grouping()
         return self._grouped_cache
 
-    def _do_group(self):
+    def _do_grouping(self):
+        """Group the dataframe
+        """
+        # First, do groupby on the first key by sorting on the first key.
+        # This will sort & shuffle the partitions.
         firstkey = self._by[0]
         df = self._df.sort_value(firstkey)
         groups = df.to_delayed()
-
+        # Second, do groupby internally for each partition.
         @delayed
         def _groupby(df, by):
             grouped = df.groupby(by=by)
@@ -50,6 +56,9 @@ class Groupby(object):
 
     def count(self):
         return self._aggregation(lambda g: g.count())
+
+    def mean(self):
+        return self._aggregation(lambda g: g.mean())
 
 
 def _extract_data_to_check_group_overlap(grouped, by):
