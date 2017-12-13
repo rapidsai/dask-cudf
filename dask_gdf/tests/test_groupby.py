@@ -85,7 +85,7 @@ def test_groupby_multi_keys(keygen):
     np.testing.assert_array_equal(got.z, expect.z)
 
 
-@pytest.mark.parametrize('agg', ['mean', 'count'])
+@pytest.mark.parametrize('agg', ['mean', 'count', 'max', 'min', 'std'])
 def test_groupby_agg(agg):
     np.random.seed(0)
 
@@ -107,4 +107,3 @@ def test_groupby_agg(agg):
 
     np.testing.assert_array_almost_equal(got.v1, exp.v1)
     np.testing.assert_array_almost_equal(got.v2, exp.v2)
-

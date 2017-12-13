@@ -54,11 +54,22 @@ class Groupby(object):
         parts = [delayed(reducer)(g) for g in self._grouped]
         return from_delayed(parts).reset_index()
 
+    # Aggregation APIs
+
     def count(self):
         return self._aggregation(lambda g: g.count())
 
     def mean(self):
         return self._aggregation(lambda g: g.mean())
+
+    def max(self):
+        return self._aggregation(lambda g: g.max())
+
+    def min(self):
+        return self._aggregation(lambda g: g.min())
+
+    def std(self):
+        return self._aggregation(lambda g: g.std())
 
 
 def _extract_data_to_check_group_overlap(grouped, by):
