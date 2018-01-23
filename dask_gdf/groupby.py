@@ -54,6 +54,18 @@ class Groupby(object):
         parts = [delayed(reducer)(g) for g in self._grouped]
         return from_delayed(parts).reset_index()
 
+    def apply_grouped(self, *args, **kwargs):
+        """Transform each group using a GPU function.
+
+        Calls ``pygdf.Groupby.apply_grouped`` concurrently
+        """
+        @delayed
+        def apply_to_group(grp):
+            return grp.apply_grouped(*args, **kwargs)
+
+        grouped = [apply_to_group(g) for g in self._grouped]
+        return from_delayed(grouped)
+
     # Aggregation APIs
 
     def count(self):
