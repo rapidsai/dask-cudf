@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import pytest
+from numba import cuda
 
 import pygdf as gd
 import dask_gdf as dgd
@@ -107,3 +108,95 @@ def test_groupby_agg(agg):
 
     np.testing.assert_array_almost_equal(got.v1, exp.v1)
     np.testing.assert_array_almost_equal(got.v2, exp.v2)
+
+
+def test_groupby_apply_grouped():
+    np.random.seed(0)
+
+    nelem = 100
+    xs = _gen_uniform_keys(nelem)
+    ys = _gen_uniform_keys(nelem)
+    df = pd.DataFrame({'x': xs,
+                       'y': ys,
+                       'idx': np.arange(nelem),
+                       'v1': np.random.normal(size=nelem),
+                       'v2': np.random.normal(size=nelem)})
+
+    gdf = gd.DataFrame.from_pandas(df)
+    dgf = dgd.from_pygdf(gdf, npartitions=2)
+
+    def transform(y, v1, v2, out1):
+        for i in range(cuda.threadIdx.x, y.size, cuda.blockDim.x):
+            out1[i] = y[i] * (v1[i] + v2[i])
+
+    grouped = dgf.groupby(by=['x', 'y']).apply_grouped(
+        transform,
+        incols=['y', 'v1', 'v2'],
+        outcols={'out1': np.float64},
+        )
+
+    # Compute with dask
+    dgd_grouped = grouped.compute().to_pandas()
+    binning = {}
+    for _, row in dgd_grouped.iterrows():
+        binning[row.idx] = row
+
+    # Emulate the operation with pandas
+    def emulate(df):
+        df['out1'] = df.y * (df.v1 + df.v2)
+        return df
+
+    pd_groupby = df.groupby(
+        by=['x', 'y'], sort=True, as_index=True
+    ).apply(emulate)
+
+    # Check the result
+    for _, expect in pd_groupby.iterrows():
+        got = binning[expect.idx]
+
+        attrs = ['x', 'y', 'v1', 'v2', 'out1']
+        for a in attrs:
+            np.testing.assert_equal(getattr(got, a),
+                                    getattr(expect, a))
+
+
+def test_groupby_apply():
+    np.random.seed(0)
+
+    nelem = 100
+    xs = _gen_uniform_keys(nelem)
+    ys = _gen_uniform_keys(nelem)
+    df = pd.DataFrame({'x': xs,
+                       'y': ys,
+                       'idx': np.arange(nelem),
+                       'v1': np.random.normal(size=nelem),
+                       'v2': np.random.normal(size=nelem)})
+
+    gdf = gd.DataFrame.from_pandas(df)
+    dgf = dgd.from_pygdf(gdf, npartitions=2)
+
+    def transform(df):
+        df['out1'] = df.y * (df.v1 + df.v2)
+        return df
+
+    grouped = dgf.groupby(by=['x', 'y']).apply(transform)
+
+    # Compute with dask
+    dgd_grouped = grouped.compute().to_pandas()
+    binning = {}
+    for _, row in dgd_grouped.iterrows():
+        binning[row.idx] = row
+
+    # Emulate the operation with pandas
+    pd_groupby = df.groupby(
+        by=['x', 'y'], sort=True, as_index=True
+    ).apply(transform)
+
+    # Check the result
+    for _, expect in pd_groupby.iterrows():
+        got = binning[expect.idx]
+
+        attrs = ['x', 'y', 'v1', 'v2', 'out1']
+        for a in attrs:
+            np.testing.assert_equal(getattr(got, a),
+                                    getattr(expect, a))
