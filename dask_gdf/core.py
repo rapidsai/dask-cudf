@@ -611,7 +611,7 @@ class Index(Series):
 
 
 def splits_divisions_sorted_pygdf(df, chunksize):
-    segments = list(df.index.find_segments())
+    segments = list(df.index.find_segments().to_array())
     segments.append(len(df) - 1)
 
     splits = [0]
