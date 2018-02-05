@@ -62,7 +62,7 @@ class Groupby(object):
             return grp.apply(function)
 
         grouped = [apply_to_group(g) for g in self._grouped]
-        return from_delayed(grouped)
+        return from_delayed(grouped).reset_index()
 
     def apply_grouped(self, *args, **kwargs):
         """Transform each group using a GPU function.
@@ -74,7 +74,7 @@ class Groupby(object):
             return grp.apply_grouped(*args, **kwargs)
 
         grouped = [apply_to_group(g) for g in self._grouped]
-        return from_delayed(grouped)
+        return from_delayed(grouped).reset_index()
 
     # Aggregation APIs
 
