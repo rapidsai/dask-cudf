@@ -5,6 +5,9 @@ language: python
 branches:
     only:
         - master
+env:
+  global:
+    secure: "EshQIp5V0GGuSsz46Y2o4zAFxi8LOjwL9tCqQNRZbPWeS9XGKLUwNsCdm+XGgiEZa6KIfkMJmMQF3i0Kiun59ltNzxfrJ9AfYCxGIMnW55N7aWGok+pRQkvikDNEg2svuBatsZOdb+4Y1geHIwwTnGh4EH7IGGrKvuIvGY1NhC46OLuFAMcJjx68SPguBXnU8Frnqdt/g38D7z2yU5KU849q80AidOMHsTtLq39kJyEQqev72zM+XA3jdnAV3S3oKmDjyd05maOgORyb6iVe+3/xwOVr2ekC1CG5WUgnYfUbNhYV9fPK+HuL+Ss9n+VlGrBeKkYU+BdZ2TfEG1EqCsEspN40U47epRBoUVFXV3xtqMx9KuACJ7w3fTOp73uxLC3moU9gnqbZ4uzWoHwDAZDeceDxbg+m2hNZ+5syPIiwYvuDqsFdcQKcquLnj/G0nb9sA/kV0xU+ZFYQ9U8y93SFHgmAxqye80sZ9S2BJdyMKnx+h+P7lcw13BmuOXmPZcfmi9tF+a8pfk6F4c0o1H6Uh/Ug5Ln8kpmjSqIvR7s1vqOVCUydQs1/kIL6eIqx9edz5nvaLqECh8pO1XiPpSmg4AWhxT9zk/Gr1xFdwNoLOH1pPoXVdyUWiXMfFwHOvu2jvGTX26AoeW+Gd4dgV9uUQA3B0K/mIGtATxplq8I="
 
 matrix:
   include:
@@ -26,7 +29,7 @@ install:
   - conda install conda-build anaconda-client --yes
 script:
   # build pygdf
-  - source ./travisci/build_dask_gdf.sh
+  - source ./travisci/build_dask_df.sh
 
 after_success:
   - source ./travisci/upload-anaconda.sh
