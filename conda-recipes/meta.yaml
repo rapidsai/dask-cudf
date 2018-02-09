@@ -1,0 +1,29 @@
+# Usage:
+#   conda build -c defaults -c conda-forge .
+package:
+  name: dask_gdf
+  version: {{ environ.get('GIT_DESCRIBE_TAG', '0.0.0.dev').lstrip('v') }}
+
+source:
+  path: ..
+
+build:
+  number: {{ environ.get('GIT_DESCRIBE_NUMBER', 0) }}
+
+requirements:
+  build:
+    - python
+  run:
+    - python
+    - pygdf 0.1.0a2.*
+    - dask 0.15.3
+    - pandas 0.20.3
+test:
+  imports:
+    - dask_gdf
+
+about:
+  home: http://gpuopenanalytics.com/
+  license: Apache
+  # license_file: LICENSE
+  summary: A Partitioned GPU Dataframe
