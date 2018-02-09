@@ -17,6 +17,7 @@ requirements:
     - python
     - pygdf 0.1.0a2.*
     - dask 0.15.3
+    - pandas 0.20.3
 test:
   imports:
     - dask_gdf
