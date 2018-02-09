@@ -2,7 +2,8 @@ from os.path import exists
 from setuptools import setup
 import versioneer
 
-packages = ['dask_gdf']
+packages = ['dask_gdf',
+            'dask_gdf.tests']
 
 setup(name='dask_gdf',
       version=versioneer.get_version(),

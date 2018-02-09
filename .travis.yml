@@ -29,7 +29,7 @@ install:
   - conda install conda-build anaconda-client --yes
 script:
   # build pygdf
-  - source ./travisci/build_dask_df.sh
+  - source ./travisci/build_dask_gdf.sh
 
 after_success:
   - source ./travisci/upload-anaconda.sh
