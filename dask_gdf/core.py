@@ -22,6 +22,7 @@ from dask.delayed import delayed
 from dask import compute
 
 from .utils import make_meta, check_meta
+from . import batcher_sortnet
 
 
 def optimize(dsk, keys, **kwargs):
@@ -403,14 +404,42 @@ class DataFrame(_Frame):
                   for df, startpos in zip(dfs, prefixes)]
         return from_delayed(outdfs)
 
-    def sort_value(self, col):
+    def sort_values(self, by):
         """Sort by the given column
 
         Parameter
         ---------
-        col : str
+        by : str
         """
-        shufidx = self._argsort(col)
+        padto = reduction(self, chunk=len, aggregate=max, split_every=False, meta='i8')
+
+        def padding(df, padto):
+            if len(df) < padto:
+                needed = padto - len(df)
+                out = gd.concat([df] + [df[:1]] * needed)
+            else:
+                out = df.copy()
+            assert len(out) == padto
+            valids = np.ones(padto, dtype=np.uint8)
+            valids[len(df):] = 0
+            out['__dask_gdf__valid'] = valids
+            return out
+
+        # XXX: why is the first reduction wrong?
+        df = self.map_partitions(padding, padto.compute())
+        parts = df.to_delayed()
+
+        sorted_parts = batcher_sortnet.sort_delayed_frame(parts, by)
+        return from_delayed(sorted_parts).reset_index()
+
+    def _shuffle_sort_values(self, by):
+        """Slow shuffle based sort by the given column
+
+        Parameter
+        ---------
+        by : str
+        """
+        shufidx = self._argsort(by)
         return self.take(shufidx)
 
     def take(self, indices, npartitions=None, chunksize=None):

@@ -4,8 +4,8 @@ Adapted from https://en.wikipedia.org/wiki/Batcher_odd%E2%80%93even_mergesort
 """
 import math
 
+import numpy as np
 from dask import delayed
-
 import pygdf
 
 
@@ -70,13 +70,17 @@ def _pad_data_to_length(parts):
 
 def _compare_frame(a, b, by):
     if a is not None and b is not None:
+        assert len(a) == len(b)
         joint = pygdf.concat([a, b])
         sorten = joint.sort_values(by=by)
-        return sorten[:len(a)], sorten[len(a):]
+        half = len(sorten) // 2
+        return sorten[:half], sorten[half:]
+    elif a is None and b is None:
+        return None, None
     elif a is None:
-        return b, None
+        return b.sort_values(by=by), None
     else:
-        return a, None
+        return a.sort_values(by=by), None
 
 
 def _compare_and_swap_frame(parts, a, b, by):
@@ -85,11 +89,36 @@ def _compare_and_swap_frame(parts, a, b, by):
     parts[b] = compared[1]
 
 
-def sort_delayed_frame(parts, column):
+def _cleanup(df):
+    assert '__dask_gdf__valid' in df.columns
+    out = df.query('__dask_gdf__valid')
+    del out['__dask_gdf__valid']
+    return out
+
+
+def sort_delayed_frame(parts, by):
+    """
+    Parameters
+    ----------
+    parts :
+        Delayed partitions of pygdf.DataFrame
+    by : str
+        Column name by which to sort
+    """
     if len(parts) == 0:
         return parts
+
     parts, valid = _pad_data_to_length(parts)
-    for a, b in oddeven_merge_sort(len(parts)):
-        _compare_and_swap_frame(parts, a, b, by=column)
-    return parts[:valid]
+    if len(parts) > 1:
+        for a, b in oddeven_merge_sort(len(parts)):
+            _compare_and_swap_frame(parts, a, b, by=by)
+    else:
+        parts = [delayed(lambda x: x.sort_values(by=by))(parts[0])]
+
+    validparts = parts[:valid]
+    return [delayed(_cleanup)(p) for p in validparts]
+
+
+
+
 

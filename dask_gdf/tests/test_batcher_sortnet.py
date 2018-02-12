@@ -50,9 +50,10 @@ def test_compare_frame(seed, nelem):
 
 def test_compare_frame_with_none():
     df = pygdf.DataFrame()
+    df['a'] = [0]
     res = batcher_sortnet._compare_frame(df, None, by='a')
-    assert res == (df, None)
+    assert res[0] is not None, res[1] is None
     res = batcher_sortnet._compare_frame(None, df, by='a')
-    assert res == (df, None)
+    assert res[0] is not None, res[1] is None
     res = batcher_sortnet._compare_frame(None, None, by='a')
     assert res == (None, None)
