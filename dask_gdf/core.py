@@ -82,6 +82,13 @@ class _Frame(Base):
         return s % (type(self).__name__, len(self.dask), self.npartitions)
 
     @property
+    def known_divisions(self):
+        """Is divisions known?
+        """
+        return len(self.divisions) > 0 and self.divisions[0] is not None
+
+
+    @property
     def npartitions(self):
         """Return number of partitions"""
         return len(self.divisions) - 1
@@ -433,8 +440,21 @@ class DataFrame(_Frame):
         def partition(sr, divs):
             return sorted(frozenset(get_parts(sr.to_array(), divs)))
 
+        @delayed
+        def first_index(df):
+            return df.index[0]
+
+        @delayed
+        def last_index(df):
+            return df.index[-1]
+
+        parts = self.to_delayed()
         # get parts
-        divs = self.divisions
+        if self.known_divisions:
+            divs = self.divisions
+        else:
+            divs = [first_index(p) for p in parts] + [last_index(parts[-1])]
+
         sridx = indices.to_delayed()
         # drop empty partitions in sridx
         sridx_sizes = compute(*map(delayed(len), sridx))
@@ -442,7 +462,6 @@ class DataFrame(_Frame):
         # compute partitioning
         partsel = compute(*(partition(sr, divs) for sr in sridx))
 
-        parts = self.to_delayed()
         grouped_parts = [tuple(parts[j] for j in sel)
                          for sel in partsel]
 
@@ -592,7 +611,7 @@ class Index(Series):
 
 
 def splits_divisions_sorted_pygdf(df, chunksize):
-    segments = list(df.index.find_segments())
+    segments = list(df.index.find_segments().to_array())
     segments.append(len(df) - 1)
 
     splits = [0]
