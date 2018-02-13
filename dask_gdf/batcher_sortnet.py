@@ -4,7 +4,6 @@ Adapted from https://en.wikipedia.org/wiki/Batcher_odd%E2%80%93even_mergesort
 """
 import math
 
-import numpy as np
 from dask import delayed, compute
 import pygdf
 
@@ -72,7 +71,9 @@ def _compare_frame(a, b, max_part_size, by):
     if a is not None and b is not None:
         joint = pygdf.concat([a, b])
         sorten = joint.sort_values(by=by)
+        # Split the sorted frame using the *max_part_size*
         lhs, rhs = sorten[:max_part_size], sorten[max_part_size:]
+        # Replace empty frame with None
         return lhs or None, rhs or None
     elif a is None and b is None:
         return None, None
@@ -106,20 +107,28 @@ def sort_delayed_frame(parts, by):
         Delayed partitions of pygdf.DataFrame
     by : str
         Column name by which to sort
-    """
 
+    The sort will also rebalance the partition sizes so that all output
+    partitions has partition size of atmost `max(original_partition_sizes)`.
+    Therefore, they may be fewer partitions in the output.
+    """
+    # Empty frame?
     if len(parts) == 0:
         return parts
-
+    # Compute maximum paritition size, which is needed
+    # for non-uniform partition size
     max_part_size = delayed(max)(*map(delayed(len), parts))
-
+    # Add empty partitions to match power-of-2 requirement.
     parts, valid = _pad_data_to_length(parts)
+    # More than 1 input?
     if len(parts) > 1:
+        # Build batcher's odd-even sorting network
         for a, b in oddeven_merge_sort(len(parts)):
             _compare_and_swap_frame(parts, a, b, max_part_size, by=by)
+    # Single input?
     else:
         parts = [delayed(lambda x: x.sort_values(by=by))(parts[0])]
-
+    # Count number of non-empty partitions
     valid_ct = delayed(sum)(list(map(delayed(lambda x: int(x is not None)),
                                      parts[:valid])))
     valid = compute(valid_ct)[0]
