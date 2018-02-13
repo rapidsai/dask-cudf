@@ -1,9 +1,6 @@
-import operator
-
 import numpy as np
 
 from dask.delayed import delayed
-from dask import compute, persist
 import pygdf
 
 from .core import from_delayed
@@ -52,7 +49,9 @@ class Groupby(object):
         def cat_and_group(*dfs):
             return pygdf.concat(dfs).reset_index().groupby(by)
 
-        parts = [delayed(chunk)(g) for g in self._grouped]
+        groupbyed = map(delayed(lambda df: df.groupby(by)),
+                        self._df.to_delayed())
+        parts = [delayed(chunk)(g) for g in groupbyed]
         while len(parts) > 1:
             chunked = _chunk_every(parts, split_every)
             parts = [delayed(cat_and_group)(*c) for c in chunked]
@@ -114,7 +113,7 @@ class Groupby(object):
         return self._aggregation(lambda g: g.min(),
                                  lambda g: g.min())
 
-    def std(self, ddof=1):
+    def _compute_std_or_var(self, ddof=1, do_std=False):
         valcols = set(self._df.columns) - set(self._by)
 
         def combine(df):
@@ -131,7 +130,7 @@ class Groupby(object):
                 mu = the_sum / the_count
                 var = the_sos / div - (mu ** 2) * the_count / div
 
-                outdf[k] = np.sqrt(var)
+                outdf[k] = np.sqrt(var) if do_std else var
 
             return outdf
 
@@ -139,6 +138,12 @@ class Groupby(object):
             lambda g: g.agg(['sum_of_squares', 'sum', 'count']),
             lambda g: g.apply(combine),
             split_every=None)
+
+    def std(self, ddof=1):
+        return self._compute_std_or_var(ddof=ddof, do_std=True)
+
+    def var(self, ddof=1):
+        return self._compute_std_or_var(ddof=ddof, do_std=False)
 
 
 def _chunk_every(seq, every):
