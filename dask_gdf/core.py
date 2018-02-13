@@ -402,7 +402,7 @@ class DataFrame(_Frame):
 
         outdfs = [fix_index(df, startpos)
                   for df, startpos in zip(dfs, prefixes)]
-        return from_delayed(outdfs)
+        return from_delayed(outdfs, meta=self._meta.reset_index())
 
     def sort_values(self, by):
         """Sort by the given column
@@ -411,27 +411,9 @@ class DataFrame(_Frame):
         ---------
         by : str
         """
-        # Pad each partition to equal length temporarily for the sort to work
-        padto = reduction(self, chunk=len, aggregate=max, split_every=False, meta='i8')
-
-        def padding(df, padto):
-            if len(df) < padto:
-                needed = padto - len(df)
-                out = gd.concat([df] + [df[:1]] * needed)
-            else:
-                out = df.copy()
-            assert len(out) == padto
-            valids = np.ones(padto, dtype=np.uint8)
-            valids[len(df):] = 0
-            out['__dask_gdf__valid'] = valids
-            return out
-
-        # XXX: why is the first reduction wrong?
-        df = self.map_partitions(padding, padto.compute())
-        parts = df.to_delayed()
-
+        parts = self.to_delayed()
         sorted_parts = batcher_sortnet.sort_delayed_frame(parts, by)
-        return from_delayed(sorted_parts).reset_index()
+        return from_delayed(sorted_parts, meta=self._meta).reset_index()
 
     def sort_values_binned(self, by):
         """Sorty by the given column and ensure that the same key
@@ -457,7 +439,6 @@ class DataFrame(_Frame):
                     to_join[j] = frozenset(intersect)
                 else:
                     break
-
 
         @delayed
         def join(df, other, keys):

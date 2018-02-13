@@ -5,7 +5,7 @@ Adapted from https://en.wikipedia.org/wiki/Batcher_odd%E2%80%93even_mergesort
 import math
 
 import numpy as np
-from dask import delayed
+from dask import delayed, compute
 import pygdf
 
 
@@ -68,13 +68,12 @@ def _pad_data_to_length(parts):
     return parts + [None] * padn, len(parts)
 
 
-def _compare_frame(a, b, by):
+def _compare_frame(a, b, max_part_size, by):
     if a is not None and b is not None:
-        assert len(a) == len(b)
         joint = pygdf.concat([a, b])
         sorten = joint.sort_values(by=by)
-        half = len(sorten) // 2
-        return sorten[:half], sorten[half:]
+        lhs, rhs = sorten[:max_part_size], sorten[max_part_size:]
+        return lhs or None, rhs or None
     elif a is None and b is None:
         return None, None
     elif a is None:
@@ -83,16 +82,19 @@ def _compare_frame(a, b, by):
         return a.sort_values(by=by), None
 
 
-def _compare_and_swap_frame(parts, a, b, by):
-    compared = delayed(_compare_frame)(parts[a], parts[b], by=by)
+def _compare_and_swap_frame(parts, a, b, max_part_size, by):
+    compared = delayed(_compare_frame)(parts[a], parts[b],
+                                       max_part_size, by=by)
     parts[a] = compared[0]
     parts[b] = compared[1]
 
 
 def _cleanup(df):
-    assert '__dask_gdf__valid' in df.columns
-    out = df.query('__dask_gdf__valid')
-    del out['__dask_gdf__valid']
+    if '__dask_gdf__valid' in df.columns:
+        out = df.query('__dask_gdf__valid')
+        del out['__dask_gdf__valid']
+    else:
+        out = df
     return out
 
 
@@ -105,20 +107,21 @@ def sort_delayed_frame(parts, by):
     by : str
         Column name by which to sort
     """
+
     if len(parts) == 0:
         return parts
+
+    max_part_size = delayed(max)(*map(delayed(len), parts))
 
     parts, valid = _pad_data_to_length(parts)
     if len(parts) > 1:
         for a, b in oddeven_merge_sort(len(parts)):
-            _compare_and_swap_frame(parts, a, b, by=by)
+            _compare_and_swap_frame(parts, a, b, max_part_size, by=by)
     else:
         parts = [delayed(lambda x: x.sort_values(by=by))(parts[0])]
 
+    valid_ct = delayed(sum)(list(map(delayed(lambda x: int(x is not None)),
+                                     parts[:valid])))
+    valid = compute(valid_ct)[0]
     validparts = parts[:valid]
-    return [delayed(_cleanup)(p) for p in validparts]
-
-
-
-
-
+    return validparts

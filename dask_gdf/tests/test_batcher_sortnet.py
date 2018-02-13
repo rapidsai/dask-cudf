@@ -21,6 +21,7 @@ def test_padding(n):
 @pytest.mark.parametrize('nelem', [2, 10, 100])
 def test_compare_frame(seed, nelem):
     np.random.seed(seed)
+    max_part_size = nelem
     # Make LHS
     lhs = pygdf.DataFrame()
     lhs['a'] = lhs_a = np.random.random(nelem)
@@ -32,7 +33,7 @@ def test_compare_frame(seed, nelem):
     rhs['b'] = rhs_b = np.random.random(nelem)
 
     # Sort by column "a"
-    got_a = batcher_sortnet._compare_frame(lhs, rhs, by='a')
+    got_a = batcher_sortnet._compare_frame(lhs, rhs, max_part_size, by='a')
     # Check
     expect_a = np.hstack([lhs_a, rhs_a])
     expect_a.sort()
@@ -40,7 +41,7 @@ def test_compare_frame(seed, nelem):
     np.testing.assert_array_equal(got_a[1].a.to_array(), expect_a[nelem:])
 
     # Sort by column "b"
-    got_b = batcher_sortnet._compare_frame(lhs, rhs, by='b')
+    got_b = batcher_sortnet._compare_frame(lhs, rhs, max_part_size, by='b')
     # Check
     expect_b = np.hstack([lhs_b, rhs_b])
     expect_b.sort()
@@ -50,10 +51,11 @@ def test_compare_frame(seed, nelem):
 
 def test_compare_frame_with_none():
     df = pygdf.DataFrame()
+    max_part_size = 1
     df['a'] = [0]
-    res = batcher_sortnet._compare_frame(df, None, by='a')
+    res = batcher_sortnet._compare_frame(df, None, max_part_size, by='a')
     assert res[0] is not None, res[1] is None
-    res = batcher_sortnet._compare_frame(None, df, by='a')
+    res = batcher_sortnet._compare_frame(None, df, max_part_size, by='a')
     assert res[0] is not None, res[1] is None
-    res = batcher_sortnet._compare_frame(None, None, by='a')
+    res = batcher_sortnet._compare_frame(None, None, max_part_size, by='a')
     assert res == (None, None)
