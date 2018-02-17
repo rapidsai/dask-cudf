@@ -200,3 +200,30 @@ def test_groupby_apply():
         for a in attrs:
             np.testing.assert_equal(getattr(got, a),
                                     getattr(expect, a))
+
+
+def test_repeated_groupby():
+    np.random.seed(0)
+
+    nelem = 100
+    df = pd.DataFrame()
+    df['a'] = _gen_uniform_keys(nelem)
+    df['b'] = _gen_uniform_keys(nelem)
+
+    ref_df = gd.DataFrame.from_pandas(df)
+    df = dgd.from_pygdf(ref_df, npartitions=3)
+    assert df.known_divisions
+
+    df2 = df.groupby('a').apply(lambda x: x)
+    assert not df2.known_divisions
+
+    got = df2.groupby('a').apply(lambda x: x).compute().to_pandas()
+    expect = ref_df.groupby('a').apply(lambda x: x).to_pandas()
+
+    def sort_content(df):
+        return sorted(list(df.b))
+
+    got = got.groupby('a').apply(sort_content)
+    expect = expect.groupby('a').apply(sort_content)
+
+    pd.util.testing.assert_series_equal(got, expect)

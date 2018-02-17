@@ -22,6 +22,7 @@ from dask.delayed import delayed
 from dask import compute
 
 from .utils import make_meta, check_meta
+from . import batcher_sortnet
 
 
 def optimize(dsk, keys, **kwargs):
@@ -80,6 +81,13 @@ class _Frame(Base):
     def __repr__(self):
         s = "<dask_gdf.%s | %d tasks | %d npartitions>"
         return s % (type(self).__name__, len(self.dask), self.npartitions)
+
+    @property
+    def known_divisions(self):
+        """Is divisions known?
+        """
+        return len(self.divisions) > 0 and self.divisions[0] is not None
+
 
     @property
     def npartitions(self):
@@ -394,16 +402,78 @@ class DataFrame(_Frame):
 
         outdfs = [fix_index(df, startpos)
                   for df, startpos in zip(dfs, prefixes)]
-        return from_delayed(outdfs)
+        return from_delayed(outdfs, meta=self._meta.reset_index())
 
-    def sort_value(self, col):
+    def sort_values(self, by):
         """Sort by the given column
 
         Parameter
         ---------
-        col : str
+        by : str
         """
-        shufidx = self._argsort(col)
+        parts = self.to_delayed()
+        sorted_parts = batcher_sortnet.sort_delayed_frame(parts, by)
+        return from_delayed(sorted_parts, meta=self._meta).reset_index()
+
+    def sort_values_binned(self, by):
+        """Sorty by the given column and ensure that the same key
+        doesn't spread across multiple partitions.
+        """
+        # Get sorted partitions
+        parts = self.sort_values(by=by).to_delayed()
+        # Get unique keys in each partition
+        @delayed
+        def get_unique(p):
+            return set(p[by].unique())
+        uniques = list(compute(*map(get_unique, parts)))
+
+        joiner = {}
+        for i in range(len(uniques)):
+            joiner[i] = to_join = {}
+            for j in range(i + 1, len(uniques)):
+                intersect = uniques[i] & uniques[j]
+                # If the keys intersect
+                if intersect:
+                    # Remove keys
+                    uniques[j] -= intersect
+                    to_join[j] = frozenset(intersect)
+                else:
+                    break
+
+        @delayed
+        def join(df, other, keys):
+            others = [other.query('{by}==@k'.format(by=by))
+                      for k in sorted(keys)]
+            return gd.concat([df] + others)
+
+        @delayed
+        def drop(df, keep_keys):
+            locvars = locals()
+            for i, k in enumerate(keep_keys):
+                locvars['k{}'.format(i)] = k
+
+            conds = ['{by}==@k{i}'.format(by=by, i=i)
+                     for i in range(len(keep_keys))]
+            expr = ' or '.join(conds)
+            return df.query(expr)
+
+        for i in range(len(parts)):
+            if uniques[i]:
+                parts[i] = drop(parts[i], uniques[i])
+                for joinee, intersect in joiner[i].items():
+                    parts[i] = join(parts[i], parts[joinee], intersect)
+
+        results = [p for i, p in enumerate(parts) if uniques[i]]
+        return from_delayed(results).reset_index()
+
+    def _shuffle_sort_values(self, by):
+        """Slow shuffle based sort by the given column
+
+        Parameter
+        ---------
+        by : str
+        """
+        shufidx = self._argsort(by)
         return self.take(shufidx)
 
     def take(self, indices, npartitions=None, chunksize=None):
@@ -433,8 +503,21 @@ class DataFrame(_Frame):
         def partition(sr, divs):
             return sorted(frozenset(get_parts(sr.to_array(), divs)))
 
+        @delayed
+        def first_index(df):
+            return df.index[0]
+
+        @delayed
+        def last_index(df):
+            return df.index[-1]
+
+        parts = self.to_delayed()
         # get parts
-        divs = self.divisions
+        if self.known_divisions:
+            divs = self.divisions
+        else:
+            divs = [first_index(p) for p in parts] + [last_index(parts[-1])]
+
         sridx = indices.to_delayed()
         # drop empty partitions in sridx
         sridx_sizes = compute(*map(delayed(len), sridx))
@@ -442,7 +525,6 @@ class DataFrame(_Frame):
         # compute partitioning
         partsel = compute(*(partition(sr, divs) for sr in sridx))
 
-        parts = self.to_delayed()
         grouped_parts = [tuple(parts[j] for j in sel)
                          for sel in partsel]
 
@@ -592,7 +674,7 @@ class Index(Series):
 
 
 def splits_divisions_sorted_pygdf(df, chunksize):
-    segments = list(df.index.find_segments())
+    segments = list(df.index.find_segments().to_array())
     segments.append(len(df) - 1)
 
     splits = [0]
