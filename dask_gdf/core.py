@@ -9,13 +9,13 @@ from libgdf_cffi import libgdf
 from toolz import merge, partition_all
 
 import dask.dataframe as dd
-from dask.base import Base, tokenize, normalize_token
+from dask.base import tokenize, normalize_token, DaskMethodsMixin
 from dask.context import _globals
 from dask.core import flatten
 from dask.compatibility import apply
-from dask.optimize import cull, fuse
+from dask.optimization import cull, fuse
 from dask.threaded import get as threaded_get
-from dask.utils import funcname, M
+from dask.utils import funcname, M, OperatorMethodMixin
 from dask.dataframe.utils import raise_on_meta_error
 from dask.dataframe.core import Scalar
 from dask.delayed import delayed
@@ -38,7 +38,7 @@ def finalize(results):
     return gd.concat(results)
 
 
-class _Frame(Base):
+class _Frame(DaskMethodsMixin, OperatorMethodMixin):
     """ Superclass for DataFrame and Series
 
     Parameters
@@ -54,9 +54,14 @@ class _Frame(Base):
     divisions : tuple of index values
         Values along which we partition our blocks on the index
     """
-    _default_get = staticmethod(threaded_get)
-    _optimize = staticmethod(optimize)
-    _finalize = staticmethod(finalize)
+    __dask_scheduler__ = staticmethod(threaded_get)
+    __dask_optimize__ = staticmethod(optimize)
+
+    def __dask_postcompute__(self):
+        return finalize, ()
+
+    def __dask_postpersist__(self):
+        return type(self), (self._name, self._meta, self.divisions)
 
     def __init__(self, dsk, name, meta, divisions):
         self.dask = dsk
@@ -69,8 +74,11 @@ class _Frame(Base):
         self._meta = meta
         self.divisions = tuple(divisions)
 
-    def _keys(self):
+    def __dask_keys__(self):
         return [(self._name, i) for i in range(self.npartitions)]
+
+    def __dask_graph__(self):
+        return self.dask
 
     def __getstate__(self):
         return (self.dask, self._name, self._meta, self.divisions)
@@ -99,7 +107,7 @@ class _Frame(Base):
         """Return dask Index instance"""
         name = self._name + '-index'
         dsk = {(name, i): (getattr, key, 'index')
-               for i, key in enumerate(self._keys())}
+               for i, key in enumerate(self.__dask_keys__())}
         return Index(merge(dsk, self.dask), name,
                      self._meta.index, self.divisions)
 
@@ -220,7 +228,7 @@ def concat(objs):
     base = 0
     lastdiv = 0
     for obj in objs:
-        for k, i in obj._keys():
+        for k, i in obj.__dask_keys__():
             dsk[name, base + i] = k, i
         base += obj.npartitions
         divisions.extend([d + lastdiv for d in obj.divisions[1:]])
@@ -800,8 +808,8 @@ def to_delayed(df):
     """
     from dask.delayed import Delayed
 
-    keys = df._keys()
-    dsk = df._optimize(df.dask, keys)
+    keys = df.__dask_keys__()
+    dsk = df.__dask_optimize__(df.dask, keys)
     return [Delayed(k, dsk) for k in keys]
 
 
@@ -997,7 +1005,7 @@ def reduction(args, chunk=None, aggregate=None, combine=None,
     a = '{0}-chunk-{1}'.format(token or funcname(chunk), token_key)
     if len(args) == 1 and isinstance(args[0], _Frame) and not chunk_kwargs:
         dsk = {(a, 0, i): (chunk, key)
-               for i, key in enumerate(args[0]._keys())}
+               for i, key in enumerate(args[0].__dask_keys__())}
     else:
         dsk = {(a, 0, i): (apply, chunk,
                            [(x._name, i) if isinstance(x, _Frame)
