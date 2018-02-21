@@ -364,9 +364,6 @@ class DataFrame(_Frame):
         left, leftuniques = self._align_divisions()
         right, rightuniques = other._align_to_indices(leftuniques)
 
-        print('leftuniques', leftuniques)
-        print('rightuniques', rightuniques)
-
         leftparts = left.to_delayed()
         rightparts = right.to_delayed()
 
@@ -489,18 +486,12 @@ class DataFrame(_Frame):
         if extras:
             uniques.append(extras)
 
-        print('originals', originals)
-        print('uniques', uniques)
-
         remap = OrderedDict()
         for idxset in uniques:
             remap[tuple(sorted(idxset))] = bins = []
             for i, orig in enumerate(originals):
                 if idxset & orig:
                     bins.append(parts[i])
-
-        from pprint import pprint
-        pprint(remap)
 
         @delayed
         def take(indices, depends):
