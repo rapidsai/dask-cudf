@@ -347,7 +347,16 @@ class DataFrame(_Frame):
 
         return Groupby(df=self, by=by)
 
-    def join(self, other, how='inner'):
+    def join(self, other, how='inner', lsuffix='', rsuffix=''):
+        """Join two datatframes
+
+        *on* is not supported.
+        """
+        same_names = set(self.columns) & set(other.columns)
+        if same_names and not (lsuffix or rsuffix):
+            raise ValueError('there are overlapping columns but '
+                             'lsuffix and rsuffix are not defined')
+
         left, leftuniques = self._align_divisions()
         right, rightuniques = other._align_to_indices(leftuniques)
 
@@ -359,7 +368,8 @@ class DataFrame(_Frame):
 
         @delayed
         def part_join(left, right, how):
-            return left.join(right, how=how, sort=True)
+            return left.join(right, how=how, sort=True,
+                             lsuffix=lsuffix, rsuffix=rsuffix)
 
         def inner_selector():
             pivot = 0
@@ -386,11 +396,15 @@ class DataFrame(_Frame):
             'inner': inner_selector,
         }[how]
 
-        rhs_dtypes = [(k, other._meta.dtypes[k]) for k in other._meta.columns]
+        rhs_dtypes = [(k, other._meta.dtypes[k])
+                      for k in other._meta.columns]
 
         @delayed
         def fix_column(lhs):
-            df = lhs.copy()
+            df = gd.DataFrame()
+            for k in lhs.columns:
+                df[k + lsuffix] = lhs[k]
+
             for k, dtype in rhs_dtypes:
                 data = np.zeros(len(lhs), dtype=dtype)
                 mask_size = gd.utils.calc_chunk_size(data.size,
@@ -400,9 +414,8 @@ class DataFrame(_Frame):
                                                  mask=mask,
                                                  null_count=data.size)
 
-                df[k] = sr.set_index(df.index)
+                df[k + rsuffix] = sr.set_index(df.index)
 
-            print(df)
             return df
 
         joinedparts = [(part_join(lhs, rhs, how=how)
@@ -410,7 +423,8 @@ class DataFrame(_Frame):
                         else fix_column(lhs))
                        for lhs, rhs in selector()]
 
-        meta = self._meta.join(other._meta, how=how)
+        meta = self._meta.join(other._meta, how=how,
+                               lsuffix=lsuffix, rsuffix=rsuffix)
         return from_delayed(joinedparts, meta=meta)
 
     def _align_divisions(self):

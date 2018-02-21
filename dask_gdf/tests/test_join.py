@@ -22,16 +22,18 @@ def test_join_inner(left_nrows, right_nrows, left_nkeys, right_nkeys):
                          'a': np.arange(left_nrows)}.items())
     right = gd.DataFrame({'x': np.random.randint(0, right_nkeys,
                                                  size=right_nrows),
-                          'b': 1000 * np.arange(right_nrows)}.items())
+                          'a': 1000 * np.arange(right_nrows)}.items())
 
-    expect = left.set_index('x').join(right.set_index('x'), how='inner', sort=True)
+    expect = left.set_index('x').join(right.set_index('x'), how='inner',
+                                      sort=True, lsuffix='l', rsuffix='r')
     expect = expect.to_pandas()
 
     # Dask GDf
     left = dgd.from_pygdf(left, chunksize=chunksize)
     right = dgd.from_pygdf(right, chunksize=chunksize)
 
-    joined = left.set_index('x').join(right.set_index('x'), how='inner')
+    joined = left.set_index('x').join(right.set_index('x'), how='inner',
+                                      lsuffix='l', rsuffix='r')
     got = joined.compute().to_pandas()
 
     # Check index
@@ -43,7 +45,7 @@ def test_join_inner(left_nrows, right_nrows, left_nkeys, right_nkeys):
     got_rows = {}
 
     def gather(df, grows):
-        grows[df['index'].values[0]] = (set(df.a), set(df.b))
+        grows[df['index'].values[0]] = (set(df.al), set(df.ar))
 
     expect.reset_index().groupby('index')\
         .apply(partial(gather, grows=expect_rows))
@@ -70,16 +72,19 @@ def test_join_left(left_nrows, right_nrows, left_nkeys, right_nkeys):
                          'a': np.arange(left_nrows, dtype=np.float64)}.items())
     right = gd.DataFrame({'x': np.random.randint(0, right_nkeys,
                                                  size=right_nrows),
-                          'b': 1000 * np.arange(right_nrows, dtype=np.float64)}.items())
+                          'a': 1000 * np.arange(right_nrows,
+                                                dtype=np.float64)}.items())
 
-    expect = left.set_index('x').join(right.set_index('x'), how='left', sort=True)
+    expect = left.set_index('x').join(right.set_index('x'), how='left',
+                                      sort=True, lsuffix='l', rsuffix='r')
     expect = expect.to_pandas()
 
     # Dask GDf
     left = dgd.from_pygdf(left, chunksize=chunksize)
     right = dgd.from_pygdf(right, chunksize=chunksize)
 
-    joined = left.set_index('x').join(right.set_index('x'), how='left')
+    joined = left.set_index('x').join(right.set_index('x'), how='left',
+                                      lsuffix='l', rsuffix='r')
     got = joined.compute().to_pandas()
 
     # Check index
@@ -91,8 +96,8 @@ def test_join_left(left_nrows, right_nrows, left_nkeys, right_nkeys):
     got_rows = {}
 
     def gather(df, grows):
-        cola = np.sort(np.asarray(df.a))
-        colb = np.sort(np.asarray(df.b))
+        cola = np.sort(np.asarray(df.al))
+        colb = np.sort(np.asarray(df.ar))
 
         grows[df['index'].values[0]] = (cola, colb)
 
