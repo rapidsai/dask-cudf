@@ -61,7 +61,8 @@ def test_join_inner(left_nrows, right_nrows, left_nkeys, right_nkeys):
 @pytest.mark.parametrize('right_nrows', param_nrows)
 @pytest.mark.parametrize('left_nkeys', [4, 5])
 @pytest.mark.parametrize('right_nkeys', [4, 5])
-def test_join_left(left_nrows, right_nrows, left_nkeys, right_nkeys):
+@pytest.mark.parametrize('how', ['left', 'right'])
+def test_join_left(left_nrows, right_nrows, left_nkeys, right_nkeys, how):
     chunksize = 50
 
     np.random.seed(0)
@@ -75,7 +76,7 @@ def test_join_left(left_nrows, right_nrows, left_nkeys, right_nkeys):
                           'a': 1000 * np.arange(right_nrows,
                                                 dtype=np.float64)}.items())
 
-    expect = left.set_index('x').join(right.set_index('x'), how='left',
+    expect = left.set_index('x').join(right.set_index('x'), how=how,
                                       sort=True, lsuffix='l', rsuffix='r')
     expect = expect.to_pandas()
 
@@ -83,7 +84,7 @@ def test_join_left(left_nrows, right_nrows, left_nkeys, right_nkeys):
     left = dgd.from_pygdf(left, chunksize=chunksize)
     right = dgd.from_pygdf(right, chunksize=chunksize)
 
-    joined = left.set_index('x').join(right.set_index('x'), how='left',
+    joined = left.set_index('x').join(right.set_index('x'), how=how,
                                       lsuffix='l', rsuffix='r')
     got = joined.compute().to_pandas()
 

@@ -352,6 +352,10 @@ class DataFrame(_Frame):
 
         *on* is not supported.
         """
+        if how == 'right':
+            return other.join(other=self, how='left', lsuffix=rsuffix,
+                              rsuffix=lsuffix)
+
         same_names = set(self.columns) & set(other.columns)
         if same_names and not (lsuffix or rsuffix):
             raise ValueError('there are overlapping columns but '
