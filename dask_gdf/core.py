@@ -347,7 +347,7 @@ class DataFrame(_Frame):
 
         return Groupby(df=self, by=by)
 
-    def join(self, other, how='inner', lsuffix='', rsuffix=''):
+    def join(self, other, how='left', lsuffix='', rsuffix=''):
         """Join two datatframes
 
         *on* is not supported.
