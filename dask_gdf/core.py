@@ -365,16 +365,50 @@ class DataFrame(_Frame):
             pivot = 0
             for i in range(len(leftparts)):
                 for j in range(pivot, len(rightparts)):
-                    print(leftuniques[i], rightuniques[j])
                     if leftuniques[i] & rightuniques[j]:
                         yield leftparts[i], rightparts[j]
                         pivot = j + 1
                         break
 
-        assert how == 'inner'
+        def left_selector():
+            pivot = 0
+            for i in range(len(leftparts)):
+                for j in range(pivot, len(rightparts)):
+                    if leftuniques[i] & rightuniques[j]:
+                        yield leftparts[i], rightparts[j]
+                        pivot = j + 1
+                        break
+                else:
+                    yield leftparts[i], None
 
-        joinedparts = [part_join(lhs, rhs, how=how)
-                       for lhs, rhs in inner_selector()]
+        selector = {
+            'left': left_selector,
+            'inner': inner_selector,
+        }[how]
+
+        rhs_dtypes = [(k, other._meta.dtypes[k]) for k in other._meta.columns]
+
+        @delayed
+        def fix_column(lhs):
+            df = lhs.copy()
+            for k, dtype in rhs_dtypes:
+                data = np.zeros(len(lhs), dtype=dtype)
+                mask_size = gd.utils.calc_chunk_size(data.size,
+                                                     gd.utils.mask_bitsize)
+                mask = np.zeros(mask_size, dtype=gd.utils.mask_dtype)
+                sr = gd.Series.from_masked_array(data=data,
+                                                 mask=mask,
+                                                 null_count=data.size)
+
+                df[k] = sr.set_index(df.index)
+
+            print(df)
+            return df
+
+        joinedparts = [(part_join(lhs, rhs, how=how)
+                        if rhs is not None
+                        else fix_column(lhs))
+                       for lhs, rhs in selector()]
 
         meta = self._meta.join(other._meta, how=how)
         return from_delayed(joinedparts, meta=meta)
