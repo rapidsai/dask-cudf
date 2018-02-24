@@ -299,6 +299,22 @@ class DataFrame(_Frame):
             del cols[cols.index(k)]
         return self[cols]
 
+    def rename(self, columns):
+        op = self
+        for k, v in columns.items():
+            op = op._rename_column(k, v)
+        return op
+
+    def _rename_column(self, k, v):
+        def replace(df, k, v):
+            sr = df[k]
+            del df[k]
+            df[v] = sr
+            return df
+
+        meta = replace(self._meta, k, v)
+        return self.map_partitions(replace, k, v, meta=meta)
+
     def assign(self, **kwargs):
         """Add columns to the dataframe.
 
