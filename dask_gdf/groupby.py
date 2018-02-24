@@ -46,17 +46,21 @@ class Groupby(object):
     def _aggregation(self, chunk, combine, split_every=8):
         by = self._by
 
-        def cat_and_group(*dfs):
-            return pygdf.concat(dfs).reset_index().groupby(by)
+        @delayed
+        def do_agg_prepare(gb):
+            df = gb.as_df()[0]
+            return df.set_index(df[by[0]])
 
-        groupbyed = map(delayed(lambda df: df.groupby(by)),
-                        self._df.to_delayed())
-        parts = [delayed(chunk)(g) for g in groupbyed]
-        while len(parts) > 1:
-            chunked = _chunk_every(parts, split_every)
-            parts = [delayed(cat_and_group)(*c) for c in chunked]
-            parts = [delayed(combine)(g) for g in parts]
-        return from_delayed(parts).reset_index()
+        fisrtgroupby = from_delayed(list(map(do_agg_prepare, self._grouped)))
+        aligned, _ = fisrtgroupby._align_divisions()
+
+        @delayed
+        def do_local_groupby(df):
+            return df.groupby(by)
+
+        tmp = map(do_local_groupby, aligned.to_delayed())
+        agg = map(delayed(chunk), tmp)
+        return from_delayed(list(agg)).reset_index()
 
     def apply(self, function):
         """Transform each group using a python function.
@@ -101,7 +105,7 @@ class Groupby(object):
                 outdf[k] = df[sumk].sum() / df[countk].sum()
             return outdf
 
-        return self._aggregation(lambda g: g.agg(['sum', 'count']),
+        return self._aggregation(lambda g: g.mean(),
                                  lambda g: g.apply(combine),
                                  split_every=None)
 
@@ -140,10 +144,12 @@ class Groupby(object):
             split_every=None)
 
     def std(self, ddof=1):
-        return self._compute_std_or_var(ddof=ddof, do_std=True)
+        # return self._compute_std_or_var(ddof=ddof, do_std=True)
+        return self._aggregation(lambda g: g.std(), None)
 
     def var(self, ddof=1):
-        return self._compute_std_or_var(ddof=ddof, do_std=False)
+        # return self._compute_std_or_var(ddof=ddof, do_std=False)
+        return self._aggregation(lambda g: g.var(), None)
 
 
 def _chunk_every(seq, every):
