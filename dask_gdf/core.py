@@ -285,8 +285,19 @@ class DataFrame(_Frame):
             dsk = {(name, i): (operator.getitem, (self._name, i), key)
                    for i in range(self.npartitions)}
             return Series(merge(self.dask, dsk), name, meta, self.divisions)
+        elif isinstance(key, list):
+            def slice_columns(df, key):
+                return df.loc[:, key]
 
+            meta = slice_columns(self._meta, key)
+            return self.map_partitions(slice_columns, key, meta=meta)
         raise NotImplementedError("Indexing with %r" % key)
+
+    def drop_columns(self, *args):
+        cols = list(self.columns)
+        for k in args:
+            del cols[cols.index(k)]
+        return self[cols]
 
     def assign(self, **kwargs):
         """Add columns to the dataframe.
