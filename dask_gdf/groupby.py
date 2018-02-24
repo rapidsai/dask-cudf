@@ -43,6 +43,9 @@ class Groupby(object):
         grouped = [_groupby(g, self._by) for g in groups]
         return grouped
 
+    def agg(self, mapping):
+        return self._aggregation(lambda df: df.agg(mapping), None)
+
     def _aggregation(self, chunk, combine, split_every=8):
         by = self._by
 
