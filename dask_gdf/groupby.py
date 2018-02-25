@@ -50,20 +50,38 @@ class Groupby(object):
         by = self._by
 
         @delayed
-        def do_agg_prepare(gb):
-            df = gb.as_df()[0]
-            return df.set_index(df[by[0]])
+        def do_local_groupby(df):
+            return chunk(df.groupby(by=by))
 
-        fisrtgroupby = from_delayed(list(map(do_agg_prepare, self._grouped)))
-        aligned, _ = fisrtgroupby._align_divisions()
 
         @delayed
-        def do_local_groupby(df):
-            return df.groupby(by)
+        def do_combine(dfs):
+            return combine(pygdf.concat(dfs).groupby(by=by))
 
-        tmp = map(do_local_groupby, aligned.to_delayed())
-        agg = map(delayed(chunk), tmp)
-        return from_delayed(list(agg)).reset_index()
+        parts = self._df.to_delayed()
+        parts = [do_local_groupby(p) for p in parts]
+        while len(parts) > 1:
+            tasks, remains = parts[:split_every], parts[split_every:]
+            out = do_combine(tasks)
+            parts = remains + [out]
+
+        return from_delayed(parts).reset_index()
+
+        # @delayed
+        # def do_agg_prepare(gb):
+        #     df = gb.as_df()[0]
+        #     return df.set_index(df[by[0]])
+
+        # fisrtgroupby = from_delayed(list(map(do_agg_prepare, self._grouped)))
+        # aligned, _ = fisrtgroupby._align_divisions()
+
+        # @delayed
+        # def do_local_groupby(df):
+        #     return df.groupby(by)
+
+        # tmp = map(do_local_groupby, aligned.to_delayed())
+        # agg = map(delayed(chunk), tmp)
+        # return from_delayed(list(agg)).reset_index()
 
     def apply(self, function):
         """Transform each group using a python function.
