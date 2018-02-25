@@ -583,7 +583,7 @@ class DataFrame(_Frame):
         elif isinstance(index, Series):
             indexname = '__dask_gdf.index'
             df = self.assign(**{indexname: index})
-            return df._set_index_raw(indexname, drop=drop, sorted=sorted)
+            return df.set_index(indexname, drop=drop, sorted=sorted)
         else:
             raise TypeError('cannot set_index from {}'.format(type(index)))
 
@@ -619,20 +619,24 @@ class DataFrame(_Frame):
     def reset_index(self):
         """Reset index to range based
         """
-        dfs = self.to_delayed()
-        sizes = np.asarray(compute(*map(delayed(len), dfs)))
-        prefixes = np.zeros_like(sizes)
-        prefixes[1:] = np.cumsum(sizes[:-1])
+        def reset_index(df):
+            return df.reset_index()
+        return self.map_partitions(reset_index, meta=reset_index(self._meta))
+        # dfs = self.to_delayed()
+        # # sizes = np.asarray(compute(*map(delayed(len), dfs)))
+        # # prefixes = np.zeros_like(sizes)
+        # # prefixes[1:] = np.cumsum(sizes[:-1])
 
-        @delayed
-        def fix_index(df, startpos):
-            return df.set_index(np.arange(start=startpos,
-                                          stop=startpos + len(df),
-                                          dtype=np.intp))
+        # @delayed
+        # def fix_index(df, startpos):
+        #     return df.reset_index()
+        #     # return df.set_index(np.arange(start=startpos,
+        #     #                               stop=startpos + len(df),
+        #     #                               dtype=np.intp))
 
-        outdfs = [fix_index(df, startpos)
-                  for df, startpos in zip(dfs, prefixes)]
-        return from_delayed(outdfs, meta=self._meta.reset_index())
+        # outdfs = [fix_index(df, startpos)
+        #           for df, startpos in zip(dfs, prefixes)]
+        # return from_delayed(outdfs, meta=self._meta.reset_index())
 
     def sort_values(self, by):
         """Sort by the given column
