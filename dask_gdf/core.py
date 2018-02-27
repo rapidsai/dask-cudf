@@ -342,6 +342,14 @@ class DataFrame(_Frame):
         meta = assigner(self._meta, k, make_meta(v))
         return self.map_partitions(assigner, k, v, meta=meta)
 
+    def apply_rows(self, func, incols, outcols, kwargs):
+        def do_apply_rows(df, func, incols, outcols, kwargs):
+            return df.apply_rows(func, incols, outcols, kwargs)
+
+        meta = do_apply_rows(self._meta, func, incols, outcols, kwargs)
+        return self.map_partitions(do_apply_rows, func, incols, outcols, kwargs,
+                                   meta=meta)
+
     def query(self, expr):
         """Query with a boolean expression using Numba to compile a GPU kernel.
 
@@ -698,7 +706,7 @@ class DataFrame(_Frame):
                     parts[i] = join(parts[i], parts[joinee], intersect)
 
         results = [p for i, p in enumerate(parts) if uniques[i]]
-        return from_delayed(results).reset_index()
+        return from_delayed(results, meta=self._meta).reset_index()
 
     def _shuffle_sort_values(self, by):
         """Slow shuffle based sort by the given column
