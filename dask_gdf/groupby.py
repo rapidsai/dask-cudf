@@ -31,7 +31,7 @@ class Groupby(object):
         # First, do groupby on the first key by sorting on the first key.
         # This will sort & shuffle the partitions.
         firstkey = self._by[0]
-        df = self._df.sort_values(firstkey)
+        df = self._df.sort_values(firstkey, ignore_index=True)
         groups = df.to_delayed()
         # Second, do groupby internally for each partition.
         @delayed

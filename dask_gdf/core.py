@@ -624,29 +624,31 @@ class DataFrame(_Frame):
         out = shuffled.map_partitions(lambda df: df.set_index(indexname))
         return out
 
-    def reset_index(self):
+    def reset_index(self, force=False):
         """Reset index to range based
         """
-        def reset_index(df):
-            return df.reset_index()
-        return self.map_partitions(reset_index, meta=reset_index(self._meta))
-        # dfs = self.to_delayed()
-        # # sizes = np.asarray(compute(*map(delayed(len), dfs)))
-        # # prefixes = np.zeros_like(sizes)
-        # # prefixes[1:] = np.cumsum(sizes[:-1])
+        if force:
+            dfs = self.to_delayed()
+            sizes = np.asarray(compute(*map(delayed(len), dfs)))
+            prefixes = np.zeros_like(sizes)
+            prefixes[1:] = np.cumsum(sizes[:-1])
 
-        # @delayed
-        # def fix_index(df, startpos):
-        #     return df.reset_index()
-        #     # return df.set_index(np.arange(start=startpos,
-        #     #                               stop=startpos + len(df),
-        #     #                               dtype=np.intp))
+            @delayed
+            def fix_index(df, startpos):
+                stoppos = startpos + len(df)
+                return df.set_index(gd.index.RangeIndex(start=startpos,
+                                                        stop=stoppos))
 
-        # outdfs = [fix_index(df, startpos)
-        #           for df, startpos in zip(dfs, prefixes)]
-        # return from_delayed(outdfs, meta=self._meta.reset_index())
+            outdfs = [fix_index(df, startpos)
+                      for df, startpos in zip(dfs, prefixes)]
+            return from_delayed(outdfs, meta=self._meta.reset_index())
+        else:
+            def reset_index(df):
+                return df.reset_index()
+            return self.map_partitions(reset_index,
+                                       meta=reset_index(self._meta))
 
-    def sort_values(self, by):
+    def sort_values(self, by, ignore_index=False):
         """Sort by the given column
 
         Parameter
@@ -655,7 +657,7 @@ class DataFrame(_Frame):
         """
         parts = self.to_delayed()
         sorted_parts = batcher_sortnet.sort_delayed_frame(parts, by)
-        return from_delayed(sorted_parts, meta=self._meta).reset_index()
+        return from_delayed(sorted_parts, meta=self._meta).reset_index(force=not ignore_index)
 
     def sort_values_binned(self, by):
         """Sorty by the given column and ensure that the same key
@@ -797,7 +799,7 @@ class DataFrame(_Frame):
                     for sr, deps in zip(sridx, grouped_parts)]
         out = from_delayed(shuffled)
 
-        out = out.reset_index()
+        out = out.reset_index(force=True)
         return out
 
 
