@@ -342,7 +342,7 @@ class DataFrame(_Frame):
         meta = assigner(self._meta, k, make_meta(v))
         return self.map_partitions(assigner, k, v, meta=meta)
 
-    def apply_rows(self, func, incols, outcols, kwargs):
+    def apply_rows(self, func, incols, outcols, kwargs={}):
         def do_apply_rows(df, func, incols, outcols, kwargs):
             return df.apply_rows(func, incols, outcols, kwargs)
 
