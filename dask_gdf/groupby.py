@@ -67,7 +67,7 @@ class Groupby(object):
                 parts = remains + [out]
         else:
             parts = do_combine(parts)
-        meta = chunk(self._df._meta.groupby(by=by))
+        meta = combine(chunk(self._df._meta.groupby(by=by)).groupby(by=by))
         return from_delayed(parts, meta=meta).reset_index()
 
         #### SHUFFLE VERSION
@@ -131,7 +131,7 @@ class Groupby(object):
                 outdf[k] = df[sumk].sum() / df[countk].sum()
             return outdf
 
-        return self._aggregation(lambda g: g.mean(),
+        return self._aggregation(lambda g: g.agg(['sum', 'count']),
                                  lambda g: g.apply(combine),
                                  split_every=None)
 
@@ -170,12 +170,10 @@ class Groupby(object):
             split_every=None)
 
     def std(self, ddof=1):
-        # return self._compute_std_or_var(ddof=ddof, do_std=True)
-        return self._aggregation(lambda g: g.std(), None)
+        return self._compute_std_or_var(ddof=ddof, do_std=True)
 
     def var(self, ddof=1):
-        # return self._compute_std_or_var(ddof=ddof, do_std=False)
-        return self._aggregation(lambda g: g.var(), None)
+        return self._compute_std_or_var(ddof=ddof, do_std=False)
 
 
 def _chunk_every(seq, every):
