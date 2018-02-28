@@ -285,8 +285,35 @@ class DataFrame(_Frame):
             dsk = {(name, i): (operator.getitem, (self._name, i), key)
                    for i in range(self.npartitions)}
             return Series(merge(self.dask, dsk), name, meta, self.divisions)
+        elif isinstance(key, list):
+            def slice_columns(df, key):
+                return df.loc[:, key]
 
+            meta = slice_columns(self._meta, key)
+            return self.map_partitions(slice_columns, key, meta=meta)
         raise NotImplementedError("Indexing with %r" % key)
+
+    def drop_columns(self, *args):
+        cols = list(self.columns)
+        for k in args:
+            del cols[cols.index(k)]
+        return self[cols]
+
+    def rename(self, columns):
+        op = self
+        for k, v in columns.items():
+            op = op._rename_column(k, v)
+        return op
+
+    def _rename_column(self, k, v):
+        def replace(df, k, v):
+            sr = df[k]
+            del df[k]
+            df[v] = sr
+            return df
+
+        meta = replace(self._meta, k, v)
+        return self.map_partitions(replace, k, v, meta=meta)
 
     def assign(self, **kwargs):
         """Add columns to the dataframe.
@@ -297,25 +324,31 @@ class DataFrame(_Frame):
             The keys are used for the column names.
             The values are Series for the new column.
         """
-        # Empty assign
-        if not kwargs:
-            return self
-
+        op = self
         for k, v in kwargs.items():
-            if not isinstance(v, Series):
-                msg = 'cannot column {!r} of type: {}'
-                raise TypeError(msg.format(k, type(v)))
+            op = op._assign_column(k, v)
+        return op
 
-        def assigner(df, *args):
+    def _assign_column(self, k, v):
+        if not isinstance(v, Series):
+            msg = 'cannot column {!r} of type: {}'
+            raise TypeError(msg.format(k, type(v)))
+
+        def assigner(df, k, v):
             out = df.copy()
-            for k, v in zip(args, args[1:]):
-                out.add_column(k, v)
+            out.add_column(k, v)
             return out
 
-        pairs = list(sum(kwargs.items(), ()))
-        k1, v1 = pairs[:2]
-        meta = assigner(self._meta, k1, make_meta(v1))
-        return self.map_partitions(assigner, *pairs, meta=meta)
+        meta = assigner(self._meta, k, make_meta(v))
+        return self.map_partitions(assigner, k, v, meta=meta)
+
+    def apply_rows(self, func, incols, outcols, kwargs={}):
+        def do_apply_rows(df, func, incols, outcols, kwargs):
+            return df.apply_rows(func, incols, outcols, kwargs)
+
+        meta = do_apply_rows(self._meta, func, incols, outcols, kwargs)
+        return self.map_partitions(do_apply_rows, func, incols, outcols, kwargs,
+                                   meta=meta)
 
     def query(self, expr):
         """Query with a boolean expression using Numba to compile a GPU kernel.
@@ -558,7 +591,7 @@ class DataFrame(_Frame):
         elif isinstance(index, Series):
             indexname = '__dask_gdf.index'
             df = self.assign(**{indexname: index})
-            return df._set_index_raw(indexname, drop=drop, sorted=sorted)
+            return df.set_index(indexname, drop=drop, sorted=sorted)
         else:
             raise TypeError('cannot set_index from {}'.format(type(index)))
 
@@ -591,25 +624,31 @@ class DataFrame(_Frame):
         out = shuffled.map_partitions(lambda df: df.set_index(indexname))
         return out
 
-    def reset_index(self):
+    def reset_index(self, force=False):
         """Reset index to range based
         """
-        dfs = self.to_delayed()
-        sizes = np.asarray(compute(*map(delayed(len), dfs)))
-        prefixes = np.zeros_like(sizes)
-        prefixes[1:] = np.cumsum(sizes[:-1])
+        if force:
+            dfs = self.to_delayed()
+            sizes = np.asarray(compute(*map(delayed(len), dfs)))
+            prefixes = np.zeros_like(sizes)
+            prefixes[1:] = np.cumsum(sizes[:-1])
 
-        @delayed
-        def fix_index(df, startpos):
-            return df.set_index(np.arange(start=startpos,
-                                          stop=startpos + len(df),
-                                          dtype=np.intp))
+            @delayed
+            def fix_index(df, startpos):
+                stoppos = startpos + len(df)
+                return df.set_index(gd.index.RangeIndex(start=startpos,
+                                                        stop=stoppos))
 
-        outdfs = [fix_index(df, startpos)
-                  for df, startpos in zip(dfs, prefixes)]
-        return from_delayed(outdfs, meta=self._meta.reset_index())
+            outdfs = [fix_index(df, startpos)
+                      for df, startpos in zip(dfs, prefixes)]
+            return from_delayed(outdfs, meta=self._meta.reset_index())
+        else:
+            def reset_index(df):
+                return df.reset_index()
+            return self.map_partitions(reset_index,
+                                       meta=reset_index(self._meta))
 
-    def sort_values(self, by):
+    def sort_values(self, by, ignore_index=False):
         """Sort by the given column
 
         Parameter
@@ -618,7 +657,7 @@ class DataFrame(_Frame):
         """
         parts = self.to_delayed()
         sorted_parts = batcher_sortnet.sort_delayed_frame(parts, by)
-        return from_delayed(sorted_parts, meta=self._meta).reset_index()
+        return from_delayed(sorted_parts, meta=self._meta).reset_index(force=not ignore_index)
 
     def sort_values_binned(self, by):
         """Sorty by the given column and ensure that the same key
@@ -669,7 +708,7 @@ class DataFrame(_Frame):
                     parts[i] = join(parts[i], parts[joinee], intersect)
 
         results = [p for i, p in enumerate(parts) if uniques[i]]
-        return from_delayed(results).reset_index()
+        return from_delayed(results, meta=self._meta).reset_index()
 
     def _shuffle_sort_values(self, by):
         """Slow shuffle based sort by the given column
@@ -760,7 +799,7 @@ class DataFrame(_Frame):
                     for sr, deps in zip(sridx, grouped_parts)]
         out = from_delayed(shuffled)
 
-        out = out.reset_index()
+        out = out.reset_index(force=True)
         return out
 
 

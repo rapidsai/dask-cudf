@@ -31,7 +31,7 @@ class Groupby(object):
         # First, do groupby on the first key by sorting on the first key.
         # This will sort & shuffle the partitions.
         firstkey = self._by[0]
-        df = self._df.sort_values(firstkey)
+        df = self._df.sort_values(firstkey, ignore_index=True)
         groups = df.to_delayed()
         # Second, do groupby internally for each partition.
         @delayed
@@ -43,20 +43,50 @@ class Groupby(object):
         grouped = [_groupby(g, self._by) for g in groups]
         return grouped
 
+    def agg(self, mapping):
+        return self._aggregation(lambda df: df.agg(mapping),
+                                 lambda df: df.agg(mapping))
+
     def _aggregation(self, chunk, combine, split_every=8):
         by = self._by
 
-        def cat_and_group(*dfs):
-            return pygdf.concat(dfs).reset_index().groupby(by)
+        @delayed
+        def do_local_groupby(df):
+            return chunk(df.groupby(by=by))
 
-        groupbyed = map(delayed(lambda df: df.groupby(by)),
-                        self._df.to_delayed())
-        parts = [delayed(chunk)(g) for g in groupbyed]
-        while len(parts) > 1:
-            chunked = _chunk_every(parts, split_every)
-            parts = [delayed(cat_and_group)(*c) for c in chunked]
-            parts = [delayed(combine)(g) for g in parts]
-        return from_delayed(parts).reset_index()
+        @delayed
+        def do_combine(dfs):
+            return combine(pygdf.concat(dfs).groupby(by=by))
+
+        parts = self._df.to_delayed()
+        parts = [do_local_groupby(p) for p in parts]
+        if split_every is not None:
+            while len(parts) > 1:
+                tasks, remains = parts[:split_every], parts[split_every:]
+                out = do_combine(tasks)
+                parts = remains + [out]
+        else:
+            parts = do_combine(parts)
+        meta = combine(chunk(self._df._meta.groupby(by=by)).groupby(by=by))
+        return from_delayed(parts, meta=meta).reset_index()
+
+        #### SHUFFLE VERSION
+        # @delayed
+        # def do_agg_prepare(gb):
+        #     df = gb.as_df()[0]
+        #     return df.set_index(df[by[0]])
+
+        # fisrtgroupby = from_delayed(list(map(do_agg_prepare, self._grouped)),
+        #                             meta=self._df._meta)
+        # aligned, _ = fisrtgroupby._align_divisions()
+
+        # @delayed
+        # def do_local_groupby(df):
+        #     return df.groupby(by)
+
+        # tmp = map(do_local_groupby, aligned.to_delayed())
+        # agg = map(delayed(chunk), tmp)
+        # return from_delayed(list(agg), meta=self._df._meta).reset_index()
 
     def apply(self, function):
         """Transform each group using a python function.
