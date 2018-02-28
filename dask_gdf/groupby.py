@@ -44,7 +44,8 @@ class Groupby(object):
         return grouped
 
     def agg(self, mapping):
-        return self._aggregation(lambda df: df.agg(mapping), None)
+        return self._aggregation(lambda df: df.agg(mapping),
+                                 lambda df: df.agg(mapping))
 
     def _aggregation(self, chunk, combine, split_every=8):
         by = self._by
@@ -53,26 +54,30 @@ class Groupby(object):
         def do_local_groupby(df):
             return chunk(df.groupby(by=by))
 
-
         @delayed
         def do_combine(dfs):
             return combine(pygdf.concat(dfs).groupby(by=by))
 
         parts = self._df.to_delayed()
         parts = [do_local_groupby(p) for p in parts]
-        while len(parts) > 1:
-            tasks, remains = parts[:split_every], parts[split_every:]
-            out = do_combine(tasks)
-            parts = remains + [out]
+        if split_every is not None:
+            while len(parts) > 1:
+                tasks, remains = parts[:split_every], parts[split_every:]
+                out = do_combine(tasks)
+                parts = remains + [out]
+        else:
+            parts = do_combine(parts)
+        meta = chunk(self._df._meta.groupby(by=by))
+        return from_delayed(parts, meta=meta).reset_index()
 
-        return from_delayed(parts).reset_index()
-
+        #### SHUFFLE VERSION
         # @delayed
         # def do_agg_prepare(gb):
         #     df = gb.as_df()[0]
         #     return df.set_index(df[by[0]])
 
-        # fisrtgroupby = from_delayed(list(map(do_agg_prepare, self._grouped)))
+        # fisrtgroupby = from_delayed(list(map(do_agg_prepare, self._grouped)),
+        #                             meta=self._df._meta)
         # aligned, _ = fisrtgroupby._align_divisions()
 
         # @delayed
@@ -81,7 +86,7 @@ class Groupby(object):
 
         # tmp = map(do_local_groupby, aligned.to_delayed())
         # agg = map(delayed(chunk), tmp)
-        # return from_delayed(list(agg)).reset_index()
+        # return from_delayed(list(agg), meta=self._df._meta).reset_index()
 
     def apply(self, function):
         """Transform each group using a python function.
