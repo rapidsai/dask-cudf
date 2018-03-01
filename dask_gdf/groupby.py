@@ -47,7 +47,7 @@ class Groupby(object):
         return self._aggregation(lambda df: df.agg(mapping),
                                  lambda df: df.agg(mapping))
 
-    def _aggregation(self, chunk, combine, split_every=8):
+    def _aggregation(self, chunk, combine, split_every=4):
         by = self._by
 
         @delayed
