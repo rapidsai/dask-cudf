@@ -399,7 +399,7 @@ class DataFrame(_Frame):
         same_names = set(left_val_names) & set(right_val_names)
         if same_names and not (lsuffix or rsuffix):
             raise ValueError('there are overlapping columns but '
-                                'lsuffix and rsuffix are not defined')
+                             'lsuffix and rsuffix are not defined')
 
         assert how == 'left'
 
@@ -428,22 +428,8 @@ class DataFrame(_Frame):
         def concat(ht, *frames):
             return gd.concat(frames)
 
-            keyname = '__dask_gdf.hashed'
-            left = pd.DataFrame()
-            left[keyname] = ht
-
-            filtered = []
-            for df in frames:
-                rhs_ht = build_hashtable(df)
-                df = df.to_pandas()
-                df[keyname] = rhs_ht
-                # XXX: consider doing this in GDF instead once "inner"
-                #      hashed-join is available
-                df = left.merge(df, how='inner', on=[keyname])
-                del df[keyname]
-                filtered.append(df)
-
-            return gd.DataFrame.from_pandas(pd.concat(filtered))
+        def get_empty_frame(df):
+            return df[:0]
 
         def merge(left, right):
             return left.merge(right, how=how, on=on)
@@ -458,7 +444,13 @@ class DataFrame(_Frame):
         hts = list(map(operator.itemgetter(0), hts_depends))
         depends = list(map(operator.itemgetter(1), hts_depends))
 
-        reparts = [delayed(concat)(ht, *[other.to_delayed()[i] for i in dep])
+        def do_reparts(ht, dep):
+            if not dep:
+                return delayed(get_empty_frame)(other.to_delayed()[0])
+            else:
+                return delayed(concat)(ht, *[other.to_delayed()[i] for i in dep])
+
+        reparts = [do_reparts(ht, dep)
                    for ht, dep in zip(hts, compute(*depends))]
 
         res = [delayed(merge)(x, y)
