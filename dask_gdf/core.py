@@ -434,10 +434,22 @@ class DataFrame(_Frame):
         def merge(left, right):
             return left.merge(right, how=how, on=on)
 
+        def tree_reduce(fn, seq):
+            def chunking(seq):
+                for a, b in zip(seq[::2], seq[1::2]):
+                    yield a, b
+                if len(seq) % 2 != 0:
+                    yield (seq[-1],)
+
+            while len(seq) > 1:
+                seq = [reduce(fn, pair)
+                       for pair in chunking(seq)]
+            return seq[0]
+
         # Determine which right partitions has what
         whohas = [delayed(build_whohas_map)(p, i)
                   for i, p in enumerate(other.to_delayed())]
-        whohas = reduce(delayed(combine_whohas_map), whohas)
+        whohas = tree_reduce(delayed(combine_whohas_map), whohas)
         hts_depends = [delayed(build_depends)(p, whohas=whohas)
                        for p in self.to_delayed()]
 
