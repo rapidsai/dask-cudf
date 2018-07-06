@@ -396,80 +396,144 @@ class DataFrame(_Frame):
     def _merge(self, other, on, how, lsuffix, rsuffix):
         left_val_names = [k for k in self.columns if k not in on]
         right_val_names = [k for k in other.columns if k not in on]
+
+        dtypes = {k: self[k].dtype for k in self.columns}
+        dtypes.update({k: other[k].dtype for k in other.columns})
+
         same_names = set(left_val_names) & set(right_val_names)
         if same_names and not (lsuffix or rsuffix):
             raise ValueError('there are overlapping columns but '
                              'lsuffix and rsuffix are not defined')
 
         assert how == 'left'
+        hash_colname = '__dask_gdf.hash.{}'.format(hash(self))
 
-        def build_hashtable(frame):
-            mod = 1300511
+        def fix_name(k, suffix):
+            if k not in same_names:
+                suffix = ''
+            return k + suffix
+
+        def fix_left(df):
+            newdf = gd.DataFrame()
+            df = df.reset_index()
+            for k in on:
+                newdf[k] = df[k]
+            for k in left_val_names:
+                newdf[fix_name(k, lsuffix)] = df[k]
+            for k in right_val_names:
+                newdf[fix_name(k, rsuffix)] = nullcolumn(len(df), dtypes[k])
+            return newdf
+
+        def fix_right(df):
+            newdf = gd.DataFrame()
+            df = df.reset_index()
+            for k in on:
+                newdf[k] = df[k]
+            for k in left_val_names:
+                newdf[fix_name(k, lsuffix)] = nullcolumn(len(df), dtypes[k])
+            for k in right_val_names:
+                newdf[fix_name(k, rsuffix)] = df[k]
+            return newdf
+
+        def nullcolumn(nelem, dtype):
+            data = np.zeros(nelem, dtype=dtype)
+            mask_size = gd.utils.calc_chunk_size(data.size,
+                                                 gd.utils.mask_bitsize)
+            mask = np.zeros(mask_size, dtype=gd.utils.mask_dtype)
+            sr = gd.Series.from_masked_array(data=data,
+                                             mask=mask,
+                                             null_count=data.size)
+            return sr
+
+        def make_empty():
+            df = gd.DataFrame()
+            for k in on:
+                df[k] = np.asarray([], dtype=dtypes[k])
+            for k in left_val_names:
+                df[fix_name(k, lsuffix)] = np.asarray([], dtype=dtypes[k])
+            for k in right_val_names:
+                df[fix_name(k, rsuffix)] = np.asarray([], dtype=dtypes[k])
+            return df
+
+        empty_frame = make_empty()
+
+        def local_shuffle(frame, mod):
             subset = frame.loc[:, on].to_pandas()
-            multihash = subset.values
-            multihash = multihash * (1 + np.arange(multihash.ndim))
-            hashed = pd.util.hash_array(multihash.sum(axis=1))
-            hashtable = pd.util.hash_array(hashed % mod)
-            return hashtable
+            hashed = pd.util.hash_pandas_object(subset, index=False)
+            hashvalues = hashed.astype(np.int64) % mod
+            frame = frame.reset_index()
+            frame.add_column(hash_colname, hashvalues, forceindex=True)
+            groups = tuple(frame.groupby(hash_colname))
 
-        def build_whohas_map(frame, partid):
-            ht = build_hashtable(frame)
-            whohas_map = {v: set([partid]) for v in ht}
-            return whohas_map
+            def cleanup(df):
+                df = df.copy()
+                df.drop_column(hash_colname)
+                return df
+            return {g[hash_colname][0]: cleanup(g) for g in groups}
 
-        def combine_whohas_map(a, b):
-            return merge_with(lambda vs: reduce(operator.or_, vs), a, b)
+        left_parts = self.to_delayed()
+        right_parts = other.to_delayed()
 
-        def build_depends(frame, whohas):
-            ht = build_hashtable(frame)
-            common = frozenset(ht) & frozenset(whohas.keys())
-            return ht, {v for k in common for v in whohas[k]}
+        # Add column w/ hash(v) % nparts
+        nparts = max(len(left_parts), len(right_parts))
 
-        def concat(ht, *frames):
-            return gd.concat(frames)
+        left_hashed = [delayed(local_shuffle)(part, nparts)
+                       for part in left_parts]
 
-        def get_empty_frame(df):
-            return df[:0]
+        right_hashed = [delayed(local_shuffle)(part, nparts)
+                        for part in right_parts]
 
-        def merge(left, right):
-            return left.merge(right, how=how, on=on)
+        # Fanout each partition into nparts subgroups
+        def get_subgroup(groups, i):
+            out = groups.get(i)
+            if out is None:
+                return ()
+            return out
 
-        def tree_reduce(fn, seq):
-            def chunking(seq):
-                for a, b in zip(seq[::2], seq[1::2]):
-                    yield a, b
-                if len(seq) % 2 != 0:
-                    yield (seq[-1],)
+        left_subgroups = [
+            [delayed(get_subgroup)(part, j) for part in left_hashed]
+            for j in range(nparts)
+        ]
 
-            while len(seq) > 1:
-                seq = [reduce(fn, pair)
-                       for pair in chunking(seq)]
-            return seq[0]
+        right_subgroups = [
+            [delayed(get_subgroup)(part, j) for part in right_hashed]
+            for j in range(nparts)
+        ]
+        assert len(left_subgroups) == len(right_subgroups)
 
-        # Determine which right partitions has what
-        whohas = [delayed(build_whohas_map)(p, i)
-                  for i, p in enumerate(other.to_delayed())]
-        whohas = tree_reduce(delayed(combine_whohas_map), whohas)
-        hts_depends = [delayed(build_depends)(p, whohas=whohas)
-                       for p in self.to_delayed()]
-
-        hts = list(map(operator.itemgetter(0), hts_depends))
-        depends = list(map(operator.itemgetter(1), hts_depends))
-
-        def do_reparts(ht, dep):
-            if not dep:
-                return delayed(get_empty_frame)(other.to_delayed()[0])
+        # Concat
+        def concat(*frames):
+            frames = list(filter(len, frames))
+            if len(frames) > 1:
+                return gd.concat(frames)
+            elif len(frames) == 1:
+                return frames[0]
             else:
-                return delayed(concat)(ht, *[other.to_delayed()[i] for i in dep])
+                return None
 
-        reparts = [do_reparts(ht, dep)
-                   for ht, dep in zip(hts, compute(*depends))]
+        left_cats = [delayed(concat)(*it) for it in left_subgroups]
+        right_cats = [delayed(concat)(*it) for it in right_subgroups]
 
-        res = [delayed(merge)(x, y)
-               for x, y in zip(self.to_delayed(), reparts)]
+        # Combine
+        def merge(left, right):
+            if left is None and right is None:
+                return empty_frame
+            elif left is None:
+                return empty_frame
+            elif right is None:
+                return fix_left(left)
+            else:
+                return left.merge(right, on=on, how=how)
 
-        return from_delayed(res, prefix='join_result')
+        merged = [delayed(merge)(left_cats[i], right_cats[i])
+                  for i in range(nparts)]
 
+        # Filter out empty frames
+        # lengths = compute(*[delayed(len)(x) for x in merged])
+        # final = [x for n, x in zip(lengths, merged) if n > 0]
+        final = merged
+
+        return from_delayed(final, prefix='join_result', meta=empty_frame)
 
     def join(self, other, how='left', lsuffix='', rsuffix=''):
         """Join two datatframes
