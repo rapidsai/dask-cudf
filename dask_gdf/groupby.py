@@ -124,7 +124,7 @@ class Groupby(object):
         valcols = set(self._df.columns) - set(self._by)
 
         def combine(df):
-            outdf = df[:1].loc[:, list(self._by)]
+            outdf = df[:1].loc[:, list(self._by)].reset_index()
             for k in valcols:
                 sumk = '{}_sum'.format(k)
                 countk = '{}_count'.format(k)
@@ -147,7 +147,7 @@ class Groupby(object):
         valcols = set(self._df.columns) - set(self._by)
 
         def combine(df):
-            outdf = df[:1].loc[:, list(self._by)]
+            outdf = df[:1].loc[:, list(self._by)].reset_index()
             for k in valcols:
                 sosk = '{}_sum_of_squares'.format(k)
                 sumk = '{}_sum'.format(k)
