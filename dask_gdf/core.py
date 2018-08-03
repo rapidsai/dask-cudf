@@ -386,6 +386,8 @@ class DataFrame(_Frame):
         return Groupby(df=self, by=by)
 
     def merge(self, other, on=None, how='left', lsuffix='_x', rsuffix='_y'):
+        """Merging two dataframes on the column(s) indicated in *on*.
+        """
         assert how == 'left', 'left join is impelemented'
         if on is None or len(on) == 1:
             return self.join(other, how=how, lsuffix=lsuffix, rsuffix=rsuffix)
@@ -529,10 +531,7 @@ class DataFrame(_Frame):
                   for i in range(nparts)]
 
         # Filter out empty frames
-        # lengths = compute(*[delayed(len)(x) for x in merged])
-        # final = [x for n, x in zip(lengths, merged) if n > 0]
         final = merged
-
         return from_delayed(final, prefix='join_result', meta=empty_frame)
 
     def join(self, other, how='left', lsuffix='', rsuffix=''):
