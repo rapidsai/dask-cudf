@@ -154,12 +154,7 @@ def test_merge_left(left_nrows, right_nrows, left_nkeys, right_nkeys, how='left'
 
     joined = left.merge(right, on=('x', 'y'), how=how)
 
-    # XXX
-    # got = pd.concat(parts.compute().to_pandas()
-    #                 for parts in joined.to_delayed())
-
     print("Got".center(80,'='))
-    # got = joined.compute(scheduler='single-threaded').to_pandas()
     got = joined.compute().to_pandas()
 
     got = got.sort_values(['x', 'y', 'a_x', 'a_y']).reset_index(drop=True)

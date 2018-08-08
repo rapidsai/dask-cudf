@@ -462,6 +462,7 @@ class DataFrame(_Frame):
 
         def local_shuffle(frame, mod):
             hashvalues = frame.hash_columns(on)
+            # XXX: need to inplace mod operator in pygdf
             _cuda_modulo_inplace.forall(len(hashvalues))(
                 # XXX: allow for inplace operation
                 hashvalues._column.data.to_gpu_array(),
