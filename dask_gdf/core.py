@@ -7,6 +7,7 @@ from functools import reduce
 import numpy as np
 import pandas as pd
 import pygdf as gd
+from numba import cuda
 from libgdf_cffi import libgdf
 from toolz import merge, partition_all, merge_with
 
@@ -460,9 +461,12 @@ class DataFrame(_Frame):
         empty_frame = make_empty()
 
         def local_shuffle(frame, mod):
-            subset = frame.loc[:, on].to_pandas()
-            hashed = pd.util.hash_pandas_object(subset, index=False)
-            hashvalues = hashed.astype(np.int64) % mod
+            hashvalues = frame.hash_columns(on)
+            _cuda_modulo_inplace.forall(len(hashvalues))(
+                # XXX: allow for inplace operation
+                hashvalues._column.data.to_gpu_array(),
+                mod,
+                )
             frame = frame.reset_index()
             frame.add_column(hash_colname, hashvalues, forceindex=True)
             groups = tuple(frame.groupby(hash_colname))
@@ -530,9 +534,7 @@ class DataFrame(_Frame):
         merged = [delayed(merge)(left_cats[i], right_cats[i])
                   for i in range(nparts)]
 
-        # Filter out empty frames
-        final = merged
-        return from_delayed(final, prefix='join_result', meta=empty_frame)
+        return from_delayed(merged, prefix='join_result', meta=empty_frame)
 
     def join(self, other, how='left', lsuffix='', rsuffix=''):
         """Join two datatframes
@@ -1435,3 +1437,10 @@ def reduction(args, chunk=None, aggregate=None, combine=None,
             dsk.update(arg.dask)
 
     return new_dd_object(dsk, b, meta, (None, None))
+
+
+@cuda.jit
+def _cuda_modulo_inplace(arr, mod):
+    i = cuda.grid(1)
+    arr[i] %= mod
+
