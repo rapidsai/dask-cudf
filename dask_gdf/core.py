@@ -7,7 +7,6 @@ from functools import reduce
 import numpy as np
 import pandas as pd
 import pygdf as gd
-from numba import cuda
 from libgdf_cffi import libgdf
 from toolz import merge, partition_all, merge_with
 
@@ -25,8 +24,7 @@ from dask.delayed import delayed
 from dask import compute
 
 from .utils import make_meta, check_meta
-from . import batcher_sortnet
-
+from . import batcher_sortnet, join_impl
 
 def optimize(dsk, keys, **kwargs):
     flatkeys = list(flatten(keys)) if isinstance(keys, list) else [keys]
@@ -393,149 +391,14 @@ class DataFrame(_Frame):
         if on is None or len(on) == 1:
             return self.join(other, how=how, lsuffix=lsuffix, rsuffix=rsuffix)
         else:
-            return self._merge(other, on=on, how=how, lsuffix=lsuffix,
-                               rsuffix=rsuffix)
-
-    def _merge(self, other, on, how, lsuffix, rsuffix):
-        left_val_names = [k for k in self.columns if k not in on]
-        right_val_names = [k for k in other.columns if k not in on]
-
-        dtypes = {k: self[k].dtype for k in self.columns}
-        dtypes.update({k: other[k].dtype for k in other.columns})
-
-        same_names = set(left_val_names) & set(right_val_names)
-        if same_names and not (lsuffix or rsuffix):
-            raise ValueError('there are overlapping columns but '
-                             'lsuffix and rsuffix are not defined')
-
-        assert how == 'left'
-        hash_colname = '__dask_gdf.hash.{}'.format(hash(self))
-
-        def fix_name(k, suffix):
-            if k not in same_names:
-                suffix = ''
-            return k + suffix
-
-        def fix_left(df):
-            newdf = gd.DataFrame()
-            df = df.reset_index()
-            for k in on:
-                newdf[k] = df[k]
-            for k in left_val_names:
-                newdf[fix_name(k, lsuffix)] = df[k]
-            for k in right_val_names:
-                newdf[fix_name(k, rsuffix)] = nullcolumn(len(df), dtypes[k])
-            return newdf
-
-        def fix_right(df):
-            newdf = gd.DataFrame()
-            df = df.reset_index()
-            for k in on:
-                newdf[k] = df[k]
-            for k in left_val_names:
-                newdf[fix_name(k, lsuffix)] = nullcolumn(len(df), dtypes[k])
-            for k in right_val_names:
-                newdf[fix_name(k, rsuffix)] = df[k]
-            return newdf
-
-        def nullcolumn(nelem, dtype):
-            data = np.zeros(nelem, dtype=dtype)
-            mask_size = gd.utils.calc_chunk_size(data.size,
-                                                 gd.utils.mask_bitsize)
-            mask = np.zeros(mask_size, dtype=gd.utils.mask_dtype)
-            sr = gd.Series.from_masked_array(data=data,
-                                             mask=mask,
-                                             null_count=data.size)
-            return sr
-
-        def make_empty():
-            df = gd.DataFrame()
-            for k in on:
-                df[k] = np.asarray([], dtype=dtypes[k])
-            for k in left_val_names:
-                df[fix_name(k, lsuffix)] = np.asarray([], dtype=dtypes[k])
-            for k in right_val_names:
-                df[fix_name(k, rsuffix)] = np.asarray([], dtype=dtypes[k])
-            return df
-
-        empty_frame = make_empty()
-
-        def local_shuffle(frame, mod):
-            hashvalues = frame.hash_columns(on)
-            # XXX: need to inplace mod operator in pygdf
-            _cuda_modulo_inplace.forall(len(hashvalues))(
-                # XXX: allow for inplace operation
-                hashvalues._column.data.to_gpu_array(),
-                mod,
+            return join_impl.join_frames(
+                left=self,
+                right=other,
+                on=on,
+                how=how,
+                lsuffix=lsuffix,
+                rsuffix=rsuffix,
                 )
-            frame = frame.reset_index()
-            frame.add_column(hash_colname, hashvalues, forceindex=True)
-            groups = tuple(frame.groupby(hash_colname))
-
-            def cleanup(df):
-                df = df.copy()
-                df.drop_column(hash_colname)
-                return df
-            return {g[hash_colname][0]: cleanup(g) for g in groups}
-
-        left_parts = self.to_delayed()
-        right_parts = other.to_delayed()
-
-        # Add column w/ hash(v) % nparts
-        nparts = max(len(left_parts), len(right_parts))
-
-        left_hashed = [delayed(local_shuffle)(part, nparts)
-                       for part in left_parts]
-
-        right_hashed = [delayed(local_shuffle)(part, nparts)
-                        for part in right_parts]
-
-        # Fanout each partition into nparts subgroups
-        def get_subgroup(groups, i):
-            out = groups.get(i)
-            if out is None:
-                return ()
-            return out
-
-        left_subgroups = [
-            [delayed(get_subgroup)(part, j) for part in left_hashed]
-            for j in range(nparts)
-        ]
-
-        right_subgroups = [
-            [delayed(get_subgroup)(part, j) for part in right_hashed]
-            for j in range(nparts)
-        ]
-        assert len(left_subgroups) == len(right_subgroups)
-
-        # Concat
-        def concat(*frames):
-            frames = list(filter(len, frames))
-            if len(frames) > 1:
-                return gd.concat(frames)
-            elif len(frames) == 1:
-                return frames[0]
-            else:
-                return None
-
-        left_cats = [delayed(concat)(*it) for it in left_subgroups]
-        right_cats = [delayed(concat)(*it) for it in right_subgroups]
-
-        # Combine
-        def merge(left, right):
-            if left is None and right is None:
-                return empty_frame
-            elif left is None:
-                return empty_frame
-            elif right is None:
-                return fix_left(left)
-            else:
-                return left.merge(right, on=on, how=how)
-
-        merged = [delayed(merge)(left_cats[i], right_cats[i])
-                  for i in range(nparts)]
-
-        return from_delayed(merged, prefix='join_result', meta=empty_frame)
 
     def join(self, other, how='left', lsuffix='', rsuffix=''):
         """Join two datatframes
@@ -1438,10 +1301,4 @@ def reduction(args, chunk=None, aggregate=None, combine=None,
             dsk.update(arg.dask)
 
     return new_dd_object(dsk, b, meta, (None, None))
-
-
-@cuda.jit
-def _cuda_modulo_inplace(arr, mod):
-    i = cuda.grid(1)
-    arr[i] %= mod
 
