@@ -6,7 +6,7 @@ import pygdf as gd
 import dask_gdf as dgd
 from functools import partial
 
-param_nrows = [5, 10, 100, 400]
+param_nrows = [5, 10, 50, 100]
 
 @pytest.mark.parametrize('left_nrows', param_nrows)
 @pytest.mark.parametrize('right_nrows', param_nrows)
