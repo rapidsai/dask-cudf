@@ -11,19 +11,16 @@ import dask_gdf
 def local_shuffle(frame, num_new_parts, key_columns):
     """Regroup the frame based on the key column(s)
     """
-    hash_colname = '__dask_gdf.hash.{}'.format(hash(frame))
     hashvalues = frame.hash_columns(key_columns)
     # XXX: need to inplace mod operator in pygdf
     _call_modulo_inplace(hashvalues, num_new_parts)
-    frame = frame.reset_index()
-    frame.add_column(hash_colname, hashvalues, forceindex=True)
-    groups = tuple(frame.groupby(hash_colname))
 
-    def cleanup(df):
-        df = df.copy()
-        df.drop_column(hash_colname)
-        return df
-    return {g[hash_colname][0]: cleanup(g) for g in groups}
+    frame = frame.set_index(hashvalues).sort_index()
+    segs = list(frame.index.find_segments().to_array())
+    segs.append(len(frame))
+    out = {frame.index.gpu_values[s]: frame[s:e]
+           for i, (s, e) in enumerate(zip(segs, segs[1:]))}
+    return out
 
 
 @delayed
