@@ -14,11 +14,7 @@ def local_shuffle(frame, num_new_parts, key_columns):
     hash_colname = '__dask_gdf.hash.{}'.format(hash(frame))
     hashvalues = frame.hash_columns(key_columns)
     # XXX: need to inplace mod operator in pygdf
-    _cuda_modulo_inplace.forall(len(hashvalues))(
-        # XXX: allow for inplace operation
-        hashvalues._column.data.to_gpu_array(),
-        num_new_parts,
-        )
+    _call_modulo_inplace(hashvalues, num_new_parts)
     frame = frame.reset_index()
     frame.add_column(hash_colname, hashvalues, forceindex=True)
     groups = tuple(frame.groupby(hash_colname))
@@ -170,6 +166,14 @@ def _fix_name(k, suffix, same_names):
     if k not in same_names:
         suffix = ''
     return k + suffix
+
+
+def _call_modulo_inplace(hashvalues, num_new_parts):
+    _cuda_modulo_inplace.forall(len(hashvalues))(
+        # XXX: allow for inplace operation
+        hashvalues._column.data.to_gpu_array(),
+        num_new_parts,
+        )
 
 
 @cuda.jit
