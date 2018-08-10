@@ -176,6 +176,7 @@ def _call_modulo_inplace(hashvalues, num_new_parts):
 @cuda.jit
 def _cuda_modulo_inplace(arr, mod):
     i = cuda.grid(1)
-    arr[i] %= mod
+    if i < arr.size:
+        arr[i] %= mod
 
 
