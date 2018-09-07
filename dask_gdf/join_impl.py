@@ -158,20 +158,3 @@ def _fix_name(k, suffix, same_names):
     if k not in same_names:
         suffix = ''
     return k + suffix
-
-
-def _call_modulo_inplace(hashvalues, num_new_parts):
-    _cuda_modulo_inplace.forall(len(hashvalues))(
-        # XXX: allow for inplace operation
-        hashvalues._column.data.to_gpu_array(),
-        num_new_parts,
-        )
-
-
-@cuda.jit
-def _cuda_modulo_inplace(arr, mod):
-    i = cuda.grid(1)
-    if i < arr.size:
-        arr[i] %= mod
-
-
