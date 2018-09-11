@@ -437,10 +437,9 @@ def from_dask_dataframe(df):
     ----------
     df : dask.dataframe.DataFrame
     """
-    bad_cols = df.select_dtypes(include=['O', 'M', 'm'])
+    bad_cols = df.select_dtypes(include=['O'])
     if len(bad_cols.columns):
-        raise ValueError("Object, datetime, or timedelta dtypes aren't "
-                         "supported by pygdf")
+        raise ValueError("Object dtypes aren't supported by pygdf")
 
     meta = _from_pandas(df._meta)
     dummy = DataFrame(df.dask, df._name, meta, df.divisions)
