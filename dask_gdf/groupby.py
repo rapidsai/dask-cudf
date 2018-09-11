@@ -33,6 +33,7 @@ class Groupby(object):
         firstkey = self._by[0]
         df = self._df.sort_values(firstkey, ignore_index=True)
         groups = df.to_delayed()
+
         # Second, do groupby internally for each partition.
         @delayed
         def _groupby(df, by):
@@ -44,8 +45,11 @@ class Groupby(object):
         return grouped
 
     def agg(self, mapping):
+        second_mapping = {}
+        for key, val in mapping.items():
+            second_mapping[val+"_"+key] = mapping[key]
         return self._aggregation(lambda df: df.agg(mapping),
-                                 lambda df: df.agg(mapping))
+                                 lambda df: df.agg(second_mapping))
 
     def _aggregation(self, chunk, combine, split_every=4):
         by = self._by
@@ -70,7 +74,7 @@ class Groupby(object):
         meta = combine(chunk(self._df._meta.groupby(by=by)).groupby(by=by))
         return from_delayed(parts, meta=meta).reset_index()
 
-        #### SHUFFLE VERSION
+        # SHUFFLE VERSION
         # @delayed
         # def do_agg_prepare(gb):
         #     df = gb.as_df()[0]
