@@ -293,6 +293,18 @@ class DataFrame(_Frame):
             return self.map_partitions(slice_columns, key, meta=meta)
         raise NotImplementedError("Indexing with %r" % key)
 
+    def __setitem__(self, key, value):
+        if isinstance(key, (tuple, list)):
+            df = self.assign(**{k: value[c]
+                                for k, c in zip(key, value.columns)})
+        else:
+            df = self.assign(**{key: value})
+
+        self.dask = df.dask
+        self._name = df._name
+        self._meta = df._meta
+        self.divisions = df.divisions
+    
     def drop_columns(self, *args):
         cols = list(self.columns)
         for k in args:
