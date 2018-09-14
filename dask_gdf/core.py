@@ -6,6 +6,8 @@ from collections import OrderedDict
 import numpy as np
 import pandas as pd
 import pygdf as gd
+from pygdf.datetime import DatetimeColumn
+from pygdf.series import DatetimeProperties
 from libgdf_cffi import libgdf
 from toolz import merge, partition_all
 
@@ -841,6 +843,16 @@ class Series(_Frame):
     @property
     def dtype(self):
         return self._meta.dtype
+    
+
+    @property
+    def dt(self):
+        if isinstance(self._meta._column, DatetimeColumn):
+            return delayed(DatetimeProperties)(self)
+
+        else:
+            raise AttributeError("Can only use .dt accessor with datetimelike "
+                                 "values")
 
     def astype(self, dtype):
         if dtype == self.dtype:
