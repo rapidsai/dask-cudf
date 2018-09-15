@@ -12,7 +12,6 @@ matrix:
   include:
     - env: PYTHON=3.6
     - env: PYTHON=3.5
-    - env: PYTHON=2.7
 
 before_install:
   # install miniconda
@@ -25,10 +24,11 @@ install:
   # check
   - conda --version
   # install conda build
-  - conda install conda-build anaconda-client --yes
+  - conda install conda-build anaconda-client flake8 --yes
 script:
   # build pygdf
   - source ./travisci/build_dask_gdf.sh
+  - flake8
 
 after_success:
   - source ./travisci/upload-anaconda.sh
