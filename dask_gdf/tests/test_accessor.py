@@ -32,5 +32,5 @@ def test_series(data):
 def test_datetime_accessor_initialization(data):
     pd_data = pd.Series(data.copy())
     gdf_data = Series(pd_data)
-    dask_gdf_data = dgd.from_dask_dataframe(gdf_data, npartitions=5)
+    dask_gdf_data = dgd.from_pygdf(gdf_data, npartitions=5)
     dask_gdf_data.dt 
