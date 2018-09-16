@@ -1,6 +1,8 @@
-import dask_gdf 
 from toolz import partial 
-import pygdf as gd 
+import pygdf as gd
+from pygdf.series import DatetimeProperties
+
+
 class Accessor(object):
     """
     Base class for Accessor objects dt, (and (str, cat) once there are supported
@@ -22,7 +24,6 @@ class Accessor(object):
 
     def _validate(self, series):
         pass
-
 
     @staticmethod
     def _delegate_property(obj, accessor, attr):
@@ -73,7 +74,7 @@ class Accessor(object):
 class DatetimeAccessor(Accessor):
     """ Accessor object for datetimelike properties of the Series values.
     """
-    _accessor = gd.Series.dt
+    _accessor = DatetimeProperties
     _accessor_name = 'dt'
 
     def _validate(self, series):
