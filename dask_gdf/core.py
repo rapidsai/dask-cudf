@@ -6,8 +6,6 @@ from collections import OrderedDict
 import numpy as np
 import pandas as pd
 import pygdf as gd
-from pygdf.datetime import DatetimeColumn
-from pygdf.series import DatetimeProperties
 from libgdf_cffi import libgdf
 from toolz import merge, partition_all
 
@@ -26,6 +24,7 @@ from dask import compute
 
 from .utils import make_meta, check_meta
 from . import batcher_sortnet
+from .accessor import DatetimeAccessor 
 
 
 def optimize(dsk, keys, **kwargs):
@@ -843,16 +842,6 @@ class Series(_Frame):
     @property
     def dtype(self):
         return self._meta.dtype
-    
-
-    @property
-    def dt(self):
-        if isinstance(self._meta._column, DatetimeColumn):
-            return delayed(DatetimeProperties)(self)
-
-        else:
-            raise AttributeError("Can only use .dt accessor with datetimelike "
-                                 "values")
 
     def astype(self, dtype):
         if dtype == self.dtype:
@@ -917,6 +906,10 @@ class Series(_Frame):
         return reduction(self, chunk=M.unique_k, aggregate=unique_k_agg,
                          meta=self._meta, token='unique-k',
                          split_every=split_every, k=k)
+    @property
+    def dt(self):
+        """Namespace for datetime methods"""
+        return DatetimeAccessor(self)
 
 
 for op in [operator.abs, operator.add, operator.eq, operator.gt, operator.ge,

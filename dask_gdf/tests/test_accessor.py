@@ -22,13 +22,3 @@ def test_series(data):
         np.array(pd_data), 
         np.array(dask_gdf_data.compute()),
         )
-
-@pytest.mark.parametrize('data', [data()])
-@pytest.mark.parametrize('field', fields)
-def test_dt_series(data, field):
-    pd_data = pd.Series(data.copy())
-    gdf_data = Series(pd_data)
-    dask_gdf_data = dgd.from_pygdf(gdf_data, npartitions=5)
-    base = getattr(pd_data.dt, field)
-    test = getattr(dask_gdf_data.dt, field).to_dask_dataframe().compute().astype('int64')
-    assert_series_equal(base, test)
