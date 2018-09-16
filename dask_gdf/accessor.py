@@ -2,6 +2,7 @@ from toolz import partial
 import pygdf as gd
 from pygdf.series import DatetimeProperties
 
+
 class Accessor(object):
     """
     Base class for Accessor objects dt, str, cat. 
