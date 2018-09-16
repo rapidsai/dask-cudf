@@ -28,9 +28,9 @@ def test_series(data):
         )
 
 @pytest.mark.parametrize('data', [data1()])
+@pytest.mark.xfail(raises=AttributeError)
 def test_datetime_accessor_initialization(data):
     pd_data = pd.Series(data.copy())
     gdf_data = Series(pd_data)
     dask_gdf_data = dgd.from_dask_dataframe(gdf_data, npartitions=5)
-    with pytest.raises(AttributeError):
-        dask_gdf_data.dt  
+    dask_gdf_data.dt 
