@@ -27,7 +27,7 @@ def test_series(data):
         np.array(dask_gdf_data.compute()),
         )
 
-@pytest.mark.parametrize('data': [data1()])
+@pytest.mark.parametrize('data', [data1()])
 def test_datetime_accessor_initialization(data):
     pd_data = pd.Series(data.copy())
     gdf_data = Series(pd_data)
