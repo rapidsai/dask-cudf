@@ -97,7 +97,6 @@ class _Frame(DaskMethodsMixin, OperatorMethodMixin):
         """
         return len(self.divisions) > 0 and self.divisions[0] is not None
 
-
     @property
     def npartitions(self):
         """Return number of partitions"""
@@ -346,13 +345,14 @@ class DataFrame(_Frame):
         import uuid
         if cache_key is None:
             cache_key = uuid.uuid4()
+
         def do_apply_rows(df, func, incols, outcols, kwargs):
             return df.apply_rows(func, incols, outcols, kwargs,
                                  cache_key=cache_key)
 
         meta = do_apply_rows(self._meta, func, incols, outcols, kwargs)
-        return self.map_partitions(do_apply_rows, func, incols, outcols, kwargs,
-                                   meta=meta)
+        return self.map_partitions(do_apply_rows, func, incols, outcols,
+                                   kwargs, meta=meta)
 
     def query(self, expr):
         """Query with a boolean expression using Numba to compile a GPU kernel.
@@ -677,7 +677,8 @@ class DataFrame(_Frame):
         """
         parts = self.to_delayed()
         sorted_parts = batcher_sortnet.sort_delayed_frame(parts, by)
-        return from_delayed(sorted_parts, meta=self._meta).reset_index(force=not ignore_index)
+        return from_delayed(sorted_parts, meta=self._meta).reset_index(
+            force=not ignore_index)
 
     def sort_values_binned(self, by):
         """Sorty by the given column and ensure that the same key
@@ -685,6 +686,7 @@ class DataFrame(_Frame):
         """
         # Get sorted partitions
         parts = self.sort_values(by=by).to_delayed()
+
         # Get unique keys in each partition
         @delayed
         def get_unique(p):
@@ -759,8 +761,8 @@ class DataFrame(_Frame):
 
         def get_parts(idxs, divs):
             parts = [p for i in idxs
-                       for p, (s, e) in enumerate(zip(divs, divs[1:]))
-                       if s <= i and (i < e or e == divs[-1])]
+                     for p, (s, e) in enumerate(zip(divs, divs[1:]))
+                     if s <= i and (i < e or e == divs[-1])]
             return parts
 
         @delayed
@@ -1076,10 +1078,9 @@ def from_dask_dataframe(df):
     ----------
     df : dask.dataframe.DataFrame
     """
-    bad_cols = df.select_dtypes(include=['O', 'M', 'm'])
+    bad_cols = df.select_dtypes(include=['O'])
     if len(bad_cols.columns):
-        raise ValueError("Object, datetime, or timedelta dtypes aren't "
-                         "supported by pygdf")
+        raise ValueError("Object dtypes aren't supported by pygdf")
 
     meta = _from_pandas(df._meta)
     dummy = DataFrame(df.dask, df._name, meta, df.divisions)

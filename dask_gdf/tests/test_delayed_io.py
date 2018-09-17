@@ -118,7 +118,7 @@ def test_mixing_series_frame_error():
     combined = dgd.from_delayed(delay_frame + delay_series)
 
     with pytest.raises(ValueError) as raises:
-        out = combined.compute()
+        combined.compute()
 
     raises.match(r"^Metadata mismatch found in `from_delayed`.")
     raises.match(r"Expected partition of type `DataFrame` but got `Series`")
@@ -138,7 +138,7 @@ def test_frame_extra_columns_error():
     combined = dgd.from_delayed(ddf1.to_delayed() + ddf2.to_delayed())
 
     with pytest.raises(ValueError) as raises:
-        out = combined.compute()
+        combined.compute()
 
     raises.match(r"^Metadata mismatch found in `from_delayed`.")
     raises.match(r"extra columns")
@@ -155,16 +155,14 @@ def test_frame_dtype_error():
     df2['bad'] = np.arange(nelem)
     df2['bad'] = np.arange(nelem, dtype=np.float32)
 
-
     ddf1 = dgd.from_pygdf(df1, npartitions=5)
     ddf2 = dgd.from_pygdf(df2, npartitions=5)
 
     combined = dgd.from_delayed(ddf1.to_delayed() + ddf2.to_delayed())
 
     with pytest.raises(ValueError) as raises:
-        out = combined.compute()
+        combined.compute()
 
     print("out")
     raises.match(r"^Metadata mismatch found in `from_delayed`.")
     raises.match(r"\s+\|\s+".join(['bad', 'float32', 'float64']))
-
