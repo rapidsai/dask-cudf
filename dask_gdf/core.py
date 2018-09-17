@@ -341,10 +341,6 @@ class DataFrame(_Frame):
         return op
 
     def _assign_column(self, k, v):
-        if not isinstance(v, Series):
-            msg = 'cannot column {!r} of type: {}'
-            raise TypeError(msg.format(k, type(v)))
-
         def assigner(df, k, v):
             out = df.copy()
             out[k] = v

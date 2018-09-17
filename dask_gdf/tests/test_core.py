@@ -257,3 +257,18 @@ def test_assign():
     got = out.compute().to_pandas()
     assert_frame_equal(got.loc[:, ['x', 'y']], df)
     np.testing.assert_array_equal(got['z'], pdcol)
+
+
+def test_setitem_scalar():
+    np.random.seed(0)
+    scalar = np.random.randint(10, 15)
+
+    df = pd.DataFrame({'x': np.random.randint(0, 5, size=20),
+                       'y': np.random.normal(size=20)})
+    dgf = dgd.from_pygdf(gd.DataFrame.from_pandas(df), npartitions=2)
+
+    df['z'] = scalar
+    dgf['z'] = scalar
+
+    got = dgf.compute().to_pandas()
+    np.testing.assert_array_equal(got['z'], df['z'])
