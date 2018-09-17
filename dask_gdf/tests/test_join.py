@@ -7,6 +7,7 @@ from functools import partial
 
 param_nrows = [5, 10, 100, 400]
 
+
 @pytest.mark.parametrize('left_nrows', param_nrows)
 @pytest.mark.parametrize('right_nrows', param_nrows)
 @pytest.mark.parametrize('left_nkeys', [4, 5])
@@ -54,7 +55,6 @@ def test_join_inner(left_nrows, right_nrows, left_nkeys, right_nkeys):
         .apply(partial(gather, grows=got_rows))
 
     assert got_rows == expect_rows
-
 
 
 @pytest.mark.parametrize('left_nrows', param_nrows)
