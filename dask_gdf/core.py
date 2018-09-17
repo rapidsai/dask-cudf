@@ -699,8 +699,8 @@ class DataFrame(_Frame):
         """
         parts = self.to_delayed()
         sorted_parts = batcher_sortnet.sort_delayed_frame(parts, by)
-        return from_delayed(sorted_parts, meta=self._meta)\
-            .reset_index(force=not ignore_index)
+        return from_delayed(sorted_parts, meta=self._meta).reset_index(
+            force=not ignore_index)
 
     def sort_values_binned(self, by):
         """Sorty by the given column and ensure that the same key
