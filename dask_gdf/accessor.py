@@ -1,18 +1,29 @@
-from toolz import partial 
+"""
+
+accessor.py contains classes for implementing
+accessor properties.
+
+"""
+
+from toolz import partial
 import pygdf as gd
-from pygdf.series import DatetimeProperties
 
 
 class Accessor(object):
     """
     Base class for Accessor objects dt, str, cat. 
+
     Notes
     -----
     Subclasses should define the following attributes:
     * _accessor
     * _accessor_name
+
+    Subclasses should also implement the following methods:
+    * _validate()
+
     """
-    _not_implemented = set()
+    _not_implemented = frozenset([])
 
     def __init__(self, series):
         from .core import Series
@@ -22,7 +33,10 @@ class Accessor(object):
         self._validate(series)
 
     def _validate(self, series):
-        pass
+        """ Validates the data type of series passed to the
+        accessor.
+        """
+        raise NotImplementedError("Must implement")
 
     @staticmethod
     def _delegate_property(obj, accessor, attr):
@@ -32,7 +46,7 @@ class Accessor(object):
     @staticmethod
     def _delegate_method(obj, accessor, attr, args, kwargs):
         out = getattr(getattr(obj, accessor, obj), attr)(*args, **kwargs)
-        return out 
+        return out
 
     def _property_map(self, attr):
         meta = self._delegate_property(self._series._meta,
@@ -73,6 +87,8 @@ class Accessor(object):
 class DatetimeAccessor(Accessor):
     """ Accessor object for datetimelike properties of the Series values.
     """
+    from pygdf.series import DatetimeProperties
+
     _accessor = DatetimeProperties
     _accessor_name = 'dt'
 
@@ -80,7 +96,3 @@ class DatetimeAccessor(Accessor):
         if not isinstance(series._meta._column, gd.datetime.DatetimeColumn):
             raise AttributeError("Can only use .dt accessor with datetimelike "
                                  "values")
-    
-
-
-
