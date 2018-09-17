@@ -1,5 +1,3 @@
-import operator
-
 import numpy as np
 import pandas as pd
 import pytest
@@ -32,6 +30,7 @@ def _get_reduce_fn(name):
         fn = getattr(series, name)
         return fn()
     return wrapped
+
 
 @pytest.mark.parametrize('reducer', _reducers)
 def test_series_reduce(reducer):
