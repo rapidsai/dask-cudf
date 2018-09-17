@@ -20,10 +20,10 @@ def local_shuffle(frame, num_new_parts, key_columns):
 
 @delayed
 def get_subgroup(groups, i):
-        out = groups.get(i)
-        if out is None:
-            return ()
-        return out
+    out = groups.get(i)
+    if out is None:
+        return ()
+    return out
 
 
 @delayed
