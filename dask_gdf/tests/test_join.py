@@ -162,3 +162,48 @@ def test_merge_left(left_nrows, right_nrows, left_nkeys, right_nkeys, how='left'
 
     pd.util.testing.assert_frame_equal(expect, got)
 
+
+
+
+@pytest.mark.parametrize('left_nrows', [2, 5])
+@pytest.mark.parametrize('right_nrows', [5, 10])
+@pytest.mark.parametrize('left_nkeys', [4])
+@pytest.mark.parametrize('right_nkeys', [4])
+def test_merge_1col_left(left_nrows, right_nrows, left_nkeys, right_nkeys, how='left'):
+    print(left_nrows, right_nrows, left_nkeys, right_nkeys)
+    chunksize = 3
+
+    np.random.seed(0)
+
+    # PyGDF
+    left = gd.DataFrame({'x': np.random.randint(0, left_nkeys,
+                                                size=left_nrows),
+                         'a': np.arange(left_nrows, dtype=np.float64)}.items())
+    right = gd.DataFrame({'x': np.random.randint(0, right_nkeys,
+                                                 size=right_nrows),
+                          'a': 1000 * np.arange(right_nrows,
+                                                dtype=np.float64)}.items())
+
+    print(left.to_pandas())
+    print(right.to_pandas())
+
+    expect = left.merge(right, on=['x'], how=how)
+    expect = expect.to_pandas().sort_values(['x', 'a_x', 'a_y']).reset_index(drop=True)
+
+    print("Expect".center(80,'='))
+    print(expect)
+
+    # Dask GDf
+    left = dgd.from_pygdf(left, chunksize=chunksize)
+    right = dgd.from_pygdf(right, chunksize=chunksize)
+
+    joined = left.merge(right, on=['x'], how=how)
+
+    print("Got".center(80,'='))
+    got = joined.compute().to_pandas()
+
+    got = got.sort_values(['x', 'a_x', 'a_y']).reset_index(drop=True)
+    print(got)
+
+    pd.util.testing.assert_frame_equal(expect, got)
+

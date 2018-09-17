@@ -388,7 +388,7 @@ class DataFrame(_Frame):
         """Merging two dataframes on the column(s) indicated in *on*.
         """
         assert how == 'left', 'left join is impelemented'
-        if on is None or len(on) == 1:
+        if on is None:
             return self.join(other, how=how, lsuffix=lsuffix, rsuffix=rsuffix)
         else:
             return join_impl.join_frames(
