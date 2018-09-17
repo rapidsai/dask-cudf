@@ -11,7 +11,7 @@ import pygdf as gd
 
 class Accessor(object):
     """
-    Base class for Accessor objects dt, str, cat. 
+    Base class for Accessor objects dt, str, cat.
 
     Notes
     -----
@@ -41,7 +41,7 @@ class Accessor(object):
     @staticmethod
     def _delegate_property(obj, accessor, attr):
         out = getattr(getattr(obj, accessor, obj), attr)
-        return out 
+        return out
 
     @staticmethod
     def _delegate_method(obj, accessor, attr, args, kwargs):

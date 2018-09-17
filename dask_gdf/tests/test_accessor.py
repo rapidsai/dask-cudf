@@ -1,9 +1,9 @@
-import pytest 
-import numpy as np 
+import pytest
+import numpy as np
 from pandas.util.testing import assert_series_equal
 from pygdf.dataframe import Series
-import dask_gdf as dgd 
-import pandas as pd 
+import dask_gdf as dgd
+import pandas as pd
 
 
 def data():
@@ -23,7 +23,7 @@ def test_datetime_accessor_initialization(data):
     pd_data = pd.Series(data.copy())
     gdf_data = Series(pd_data)
     dask_gdf_data = dgd.from_pygdf(gdf_data, npartitions=5)
-    dask_gdf_data.dt 
+    dask_gdf_data.dt
 
 
 @pytest.mark.parametrize('data', [data()])
@@ -33,9 +33,9 @@ def test_series(data):
     dask_gdf_data = dgd.from_pygdf(gdf_data, npartitions=5)
 
     np.testing.assert_equal(
-        np.array(pd_data), 
+        np.array(pd_data),
         np.array(dask_gdf_data.compute()),
-        )
+    )
 
 
 @pytest.mark.parametrize('data', [data()])
