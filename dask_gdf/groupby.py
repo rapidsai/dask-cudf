@@ -33,6 +33,7 @@ class Groupby(object):
         firstkey = self._by[0]
         df = self._df.sort_values(firstkey, ignore_index=True)
         groups = df.to_delayed()
+
         # Second, do groupby internally for each partition.
         @delayed
         def _groupby(df, by):
@@ -70,7 +71,7 @@ class Groupby(object):
         meta = combine(chunk(self._df._meta.groupby(by=by)).groupby(by=by))
         return from_delayed(parts, meta=meta).reset_index()
 
-        #### SHUFFLE VERSION
+        # SHUFFLE VERSION
         # @delayed
         # def do_agg_prepare(gb):
         #     df = gb.as_df()[0]

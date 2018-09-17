@@ -18,7 +18,7 @@ requirements:
     - pygdf 0.1.0a3.*
     - dask >=0.19.0
     - distributed >=1.23.0
-    - pandas >=0.20.3
+    - pandas 0.20.3
 test:
   imports:
     - dask_gdf
