@@ -259,10 +259,39 @@ def test_assign():
     np.testing.assert_array_equal(got['z'], pdcol)
 
 
-def test_setitem_scalar():
+@pytest.mark.parametrize('data_type', ['int8', 'int16', 'int32', 'int64'])
+def test_setitem_scalar_integer(data_type):
     np.random.seed(0)
-    scalar = np.random.randint(10, 15)
+    scalar = np.random.randint(0, 100, dtype=data_type)
+    df = pd.DataFrame({'x': np.random.randint(0, 5, size=20),
+                       'y': np.random.normal(size=20)})
+    dgf = dgd.from_pygdf(gd.DataFrame.from_pandas(df), npartitions=2)
 
+    df['z'] = scalar
+    dgf['z'] = scalar
+
+    got = dgf.compute().to_pandas()
+    np.testing.assert_array_equal(got['z'], df['z'])
+
+
+@pytest.mark.parametrize('data_type', ['float16', 'float32', 'float64'])
+def test_setitem_scalar_float(data_type):
+    np.random.seed(0)
+    scalar = np.random.randn(1).astype('data_type')
+    df = pd.DataFrame({'x': np.random.randint(0, 5, size=20),
+                       'y': np.random.normal(size=20)})
+    dgf = dgd.from_pygdf(gd.DataFrame.from_pandas(df), npartitions=2)
+
+    df['z'] = scalar
+    dgf['z'] = scalar
+
+    got = dgf.compute().to_pandas()
+    np.testing.assert_array_equal(got['z'], df['z'])
+
+
+def test_setitem_scalar_datetime():
+    np.random.seed(0)
+    scalar = np.dtype('datetime64[ms]').type('2017-01-01')
     df = pd.DataFrame({'x': np.random.randint(0, 5, size=20),
                        'y': np.random.normal(size=20)})
     dgf = dgd.from_pygdf(gd.DataFrame.from_pandas(df), npartitions=2)
