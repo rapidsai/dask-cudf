@@ -97,7 +97,8 @@ def test_categorical_basic(data):
     # Test attributes
     assert pdsr.cat.ordered == dsr.cat.ordered.compute()
     # TODO: Investigate dsr.cat.categories: It raises
-    # ValueError: Expected iterable of tuples of (name, dtype), got ('a', 'b', 'c')
+    # ValueError: Expected iterable of tuples of (name, dtype),
+    # got ('a', 'b', 'c')
     # assert(tuple(pdsr.cat.categories) == tuple(dsr.cat.categories))
 
     np.testing.assert_array_equal(pdsr.cat.codes.data, result.to_array())
