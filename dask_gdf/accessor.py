@@ -87,6 +87,7 @@ class Accessor(object):
 class DatetimeAccessor(Accessor):
     """ Accessor object for datetimelike properties of the Series values.
     """
+
     from pygdf.series import DatetimeProperties
 
     _accessor = DatetimeProperties
@@ -96,3 +97,20 @@ class DatetimeAccessor(Accessor):
         if not isinstance(series._meta._column, gd.datetime.DatetimeColumn):
             raise AttributeError("Can only use .dt accessor with datetimelike "
                                  "values")
+
+
+class CategoricalAccessor(Accessor):
+    """ Accessor object for categorical properties of the Series values
+    of Categorical type.
+    """
+
+    from pygdf.categorical import CategoricalAccessor as gdfCategoricalAccessor
+
+    _accessor = gdfCategoricalAccessor
+    _accessor_name = 'cat'
+
+    def _validate(self, series):
+        if not isinstance(series._meta._column,
+                          gd.categorical.CategoricalColumn):
+            raise AttributeError(
+                "Can only use .cat accessor with categorical values")
