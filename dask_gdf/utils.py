@@ -46,9 +46,6 @@ def make_meta(x):
                 return gd.index.RangeIndex(meta2.start, meta2.stop)
             return gd.index.GenericIndex(meta2)
 
-    if pd.api.types.is_scalar(meta):
-        return gd.Series(meta)
-
     return meta
 
 

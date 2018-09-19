@@ -277,7 +277,7 @@ def test_setitem_scalar_integer(data_type):
 @pytest.mark.parametrize('data_type', ['float16', 'float32', 'float64'])
 def test_setitem_scalar_float(data_type):
     np.random.seed(0)
-    scalar = np.random.randn(1).astype('data_type')
+    scalar = np.random.randn(1).astype(data_type)
     df = pd.DataFrame({'x': np.random.randint(0, 5, size=20),
                        'y': np.random.normal(size=20)})
     dgf = dgd.from_pygdf(gd.DataFrame.from_pandas(df), npartitions=2)
