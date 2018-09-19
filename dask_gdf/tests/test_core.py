@@ -274,7 +274,7 @@ def test_setitem_scalar_integer(data_type):
     np.testing.assert_array_equal(got['z'], df['z'])
 
 
-@pytest.mark.parametrize('data_type', ['float16', 'float32', 'float64'])
+@pytest.mark.parametrize('data_type', ['float32', 'float64'])
 def test_setitem_scalar_float(data_type):
     np.random.seed(0)
     scalar = np.random.randn(1).astype(data_type)[0]
