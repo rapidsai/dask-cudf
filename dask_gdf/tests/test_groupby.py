@@ -27,8 +27,6 @@ def _gen_uniform_keys(nelem):
     return xs
 
 
-@pytest.mark.skip(reason="Fix needed from \
-    https://github.com/gpuopenanalytics/dask_gdf/pull/26")
 @pytest.mark.parametrize('keygen', [_gen_skewed_keys, _gen_uniform_keys])
 def test_groupby_single_key(keygen):
     np.random.seed(0)
@@ -53,11 +51,9 @@ def test_groupby_single_key(keygen):
     # Check keys
     np.testing.assert_array_equal(got.x, expect.x)
     # Check values
-    np.testing.assert_array_equal(got.z, expect.z)
+    np.testing.assert_array_equal(got.count_z, expect.z)
 
 
-@pytest.mark.skip(reason="Fix needed from \
-    https://github.com/gpuopenanalytics/dask_gdf/pull/26")
 @pytest.mark.parametrize('keygen', [_gen_skewed_keys, _gen_uniform_keys])
 def test_groupby_multi_keys(keygen):
     np.random.seed(0)
@@ -87,13 +83,10 @@ def test_groupby_multi_keys(keygen):
     np.testing.assert_array_equal(got.x, expect.x)
     np.testing.assert_array_equal(got.y, expect.y)
     # Check values
-    np.testing.assert_array_equal(got.z, expect.z)
+    np.testing.assert_array_equal(got.count_z, expect.z)
 
 
-@pytest.mark.skip(reason="Fix needed from \
-    https://github.com/gpuopenanalytics/dask_gdf/pull/26")
-@pytest.mark.parametrize('agg', ['mean', 'count', 'max', 'min', 'std'])
-def test_groupby_agg(agg):
+def check_groupby_agg(agg):
     np.random.seed(0)
 
     nelem = 100
@@ -109,11 +102,26 @@ def test_groupby_agg(agg):
     gotgroup = dgf.groupby(by='x')
     expgroup = df.groupby(by='x', as_index=False)
 
+    def add_prefix(x):
+        return '_'.join([agg, x])
+
     got = getattr(gotgroup, agg)().compute().to_pandas()
     exp = getattr(expgroup, agg)()
+    np.testing.assert_array_almost_equal(getattr(got, add_prefix('v1')),
+                                         exp.v1)
+    np.testing.assert_array_almost_equal(getattr(got, add_prefix('v2')),
+                                         exp.v2)
 
-    np.testing.assert_array_almost_equal(got.v1, exp.v1)
-    np.testing.assert_array_almost_equal(got.v2, exp.v2)
+
+@pytest.mark.parametrize('agg', ['count', 'max', 'min'])
+def test_groupby_agg(agg):
+    check_groupby_agg(agg)
+
+
+@pytest.mark.skip(reason="Not implemented by pygdf yet")
+@pytest.mark.parametrize('agg', ['mean', 'std'])
+def test_groupby_harder_agg(agg):
+    check_groupby_agg(agg)
 
 
 @pytest.mark.skip(reason="Fix needed from \
@@ -241,3 +249,28 @@ def test_repeated_groupby():
     expect = expect.groupby('a').apply(sort_content)
 
     pd.util.testing.assert_series_equal(got, expect)
+
+
+
+@pytest.mark.parametrize('nelem', [50, 100, 1000])
+@pytest.mark.parametrize('npart', [3, 4, 5, 10])
+def test_groupby_tree_reduce_max(nelem, npart):
+    np.random.seed(0)
+    df = pd.DataFrame()
+    df['a'] = _gen_uniform_keys(nelem)
+    df['b'] = _gen_uniform_keys(nelem)
+
+    ref_df = gd.DataFrame.from_pandas(df)
+    dgf = dgd.from_pygdf(ref_df, npartitions=npart)
+    got = dgf.groupby('a').max().compute().to_pandas()
+    expect = df.groupby('a', as_index=False).max()
+
+    pd.util.testing.assert_series_equal(expect.a, got.a)
+    pd.util.testing.assert_series_equal(
+        expect.b,
+        got.max_b,
+        check_names=False,
+        )
+
+
+

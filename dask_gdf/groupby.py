@@ -52,17 +52,39 @@ class Groupby(object):
         return self._aggregation(lambda df: df.agg(mapping),
                                  lambda df: df.agg(second_mapping))
 
-    def _aggregation(self, chunk, combine, split_every=4):
+    def _aggregation(self, chunk, combine, split_every=4, prefix=''):
         by = self._by
         method = self._method
+        valcols = set(self._df.columns) - set(self._by)
+
+        def add_prefix(k):
+            if prefix:
+                return '_'.join([prefix, k])
+            else:
+                return k
+
+        colnames = list(self._by) + [add_prefix(k) for k in self._df.columns
+                                     if k in valcols]
 
         @delayed
         def do_local_groupby(df, method):
             return chunk(df.groupby(by=by, method=method))
 
+        def fix_names(df):
+            # return df
+            newdf = pygdf.DataFrame()
+            for newk, k in zip(colnames, df.columns):
+                newdf[newk] = df[k]
+            return newdf
+
+        def apply_name_fix(parts):
+            return [delayed(fix_names)(p) for p in parts]
+
         @delayed
         def do_combine(dfs, method):
             return combine(pygdf.concat(dfs).groupby(by=by, method=method))
+
+        meta = fix_names(combine(chunk(self._df._meta.groupby(by=by)).groupby(by=by)))
 
         parts = self._df.to_delayed()
         parts = [do_local_groupby(p, method) for p in parts]
@@ -70,10 +92,10 @@ class Groupby(object):
             while len(parts) > 1:
                 tasks, remains = parts[:split_every], parts[split_every:]
                 out = do_combine(tasks, method)
-                parts = remains + [out]
+                parts = apply_name_fix(remains + [out])
         else:
-            parts = do_combine(parts, method)
-        meta = combine(chunk(self._df._meta.groupby(by=by)).groupby(by=by))
+            parts = apply_name_fix(do_combine(parts, method))
+
         return from_delayed(parts, meta=meta).reset_index()
 
         # SHUFFLE VERSION
@@ -120,11 +142,13 @@ class Groupby(object):
 
     def count(self):
         return self._aggregation(lambda g: g.count(),
-                                 lambda g: g.sum())
+                                 lambda g: g.sum(),
+                                 prefix='count')
 
     def sum(self):
         return self._aggregation(lambda g: g.count(),
-                                 lambda g: g.sum())
+                                 lambda g: g.sum(),
+                                 prefix='sum')
 
     def mean(self):
         valcols = set(self._df.columns) - set(self._by)
@@ -139,15 +163,18 @@ class Groupby(object):
 
         return self._aggregation(lambda g: g.agg(['sum', 'count']),
                                  lambda g: g.apply(combine),
-                                 split_every=None)
+                                 split_every=None,
+                                 prefix='mean')
 
     def max(self):
         return self._aggregation(lambda g: g.max(),
-                                 lambda g: g.max())
+                                 lambda g: g.max(),
+                                 prefix='max')
 
     def min(self):
         return self._aggregation(lambda g: g.min(),
-                                 lambda g: g.min())
+                                 lambda g: g.min(),
+                                 prefix='min')
 
     def _compute_std_or_var(self, ddof=1, do_std=False):
         valcols = set(self._df.columns) - set(self._by)
