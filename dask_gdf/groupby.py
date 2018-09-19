@@ -9,10 +9,11 @@ from .core import from_delayed
 class Groupby(object):
     """The object returned by ``df.groupby()``.
     """
-    def __init__(self, df, by):
+    def __init__(self, df, by, method):
         self._df = df
         self._by = tuple([by]) if isinstance(by, str) else tuple(by)
         self._grouped_cache = None
+        self._method = method
 
     @property
     def _grouped(self):
@@ -36,38 +37,42 @@ class Groupby(object):
 
         # Second, do groupby internally for each partition.
         @delayed
-        def _groupby(df, by):
-            grouped = df.groupby(by=by)
+        def _groupby(df, by, method):
+            grouped = df.groupby(by=by, method=method)
             return grouped
 
         # Get the groupby objects
-        grouped = [_groupby(g, self._by) for g in groups]
+        grouped = [_groupby(g, self._by, self._method) for g in groups]
         return grouped
 
     def agg(self, mapping):
+        second_mapping = {}
+        for key, val in mapping.items():
+            second_mapping[val+"_"+key] = mapping[key]
         return self._aggregation(lambda df: df.agg(mapping),
-                                 lambda df: df.agg(mapping))
+                                 lambda df: df.agg(second_mapping))
 
     def _aggregation(self, chunk, combine, split_every=4):
         by = self._by
+        method = self._method
 
         @delayed
-        def do_local_groupby(df):
-            return chunk(df.groupby(by=by))
+        def do_local_groupby(df, method):
+            return chunk(df.groupby(by=by, method=method))
 
         @delayed
-        def do_combine(dfs):
-            return combine(pygdf.concat(dfs).groupby(by=by))
+        def do_combine(dfs, method):
+            return combine(pygdf.concat(dfs).groupby(by=by, method=method))
 
         parts = self._df.to_delayed()
-        parts = [do_local_groupby(p) for p in parts]
+        parts = [do_local_groupby(p, method) for p in parts]
         if split_every is not None:
             while len(parts) > 1:
                 tasks, remains = parts[:split_every], parts[split_every:]
-                out = do_combine(tasks)
+                out = do_combine(tasks, method)
                 parts = remains + [out]
         else:
-            parts = do_combine(parts)
+            parts = do_combine(parts, method)
         meta = combine(chunk(self._df._meta.groupby(by=by)).groupby(by=by))
         return from_delayed(parts, meta=meta).reset_index()
 

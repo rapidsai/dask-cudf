@@ -380,10 +380,10 @@ class DataFrame(_Frame):
         }
         return self.map_partitions(query, expr, callenv, meta=self._meta)
 
-    def groupby(self, by):
+    def groupby(self, by, method="hash"):
         from .groupby import Groupby
 
-        return Groupby(df=self, by=by)
+        return Groupby(df=self, by=by, method=method)
 
     def join(self, other, how='left', lsuffix='', rsuffix=''):
         """Join two datatframes
