@@ -9,6 +9,8 @@ from .core import from_delayed
 class Groupby(object):
     """The object returned by ``df.groupby()``.
     """
+    _magic_token = '__@__'
+
     def __init__(self, df, by, method):
         self._df = df
         self._by = tuple([by]) if isinstance(by, str) else tuple(by)
@@ -46,56 +48,84 @@ class Groupby(object):
         return grouped
 
     def agg(self, mapping):
-        second_mapping = {}
+        # Define how columns should be prefixed
+        prefix = {}
         for key, val in mapping.items():
-            second_mapping[val+"_"+key] = mapping[key]
-        return self._aggregation(lambda df: df.agg(mapping),
-                                 lambda df: df.agg(second_mapping))
+            prefix[key] = val
+        # Adjust *mapping* for custom prefix.
+        mapping = {self._magic_token + k: v for k, v in mapping.items()}
+        return self._aggregation(
+            lambda df: df.agg(mapping),
+            lambda df: df.agg(mapping),
+            prefix=prefix,
+            )
 
     def _aggregation(self, chunk, combine, split_every=4, prefix=''):
         by = self._by
         method = self._method
+        magic_token = self._magic_token
         valcols = set(self._df.columns) - set(self._by)
 
-        def add_prefix(k):
-            if prefix:
-                return '_'.join([prefix, k])
-            else:
-                return k
+        if isinstance(prefix, str):
+            prefix = {k: prefix for k in valcols}
 
-        colnames = list(self._by) + [add_prefix(k) for k in self._df.columns
-                                     if k in valcols]
-
-        @delayed
-        def do_local_groupby(df, method):
-            return chunk(df.groupby(by=by, method=method))
-
-        def fix_names(df):
-            # return df
+        def rename(df):
+            # Rename columns with magic_token as prefix
             newdf = pygdf.DataFrame()
-            for newk, k in zip(colnames, df.columns):
+            for k in df.columns:
+                newk = magic_token + k if k in valcols else k
                 newdf[newk] = df[k]
             return newdf
 
-        def apply_name_fix(parts):
-            return [delayed(fix_names)(p) for p in parts]
+        do_rename = delayed(rename)
+
+        def fix_name(df):
+            # Undo rename(df) and apply proper prefix base on column name
+            newdf = pygdf.DataFrame()
+            for k in df.columns:
+                if magic_token in k:
+                    _, name = k.split(magic_token, 1)
+                    newk = '_'.join([prefix[name], name])
+                else:
+                    newk = k
+                newdf[newk] = df[k]
+            return newdf
+
+        do_fix_name = delayed(fix_name)
+
+        def drop_prefix(df):
+            newdf = pygdf.DataFrame()
+            for k in df.columns:
+                if magic_token in k:
+                    _, name = k.split(magic_token, 1)
+                    newk = magic_token + name
+                else:
+                    newk = k
+                newdf[newk] = df[k]
+            return newdf
+
+        @delayed
+        def do_local_groupby(df, method):
+            return drop_prefix(chunk(df.groupby(by=by, method=method)))
 
         @delayed
         def do_combine(dfs, method):
-            return combine(pygdf.concat(dfs).groupby(by=by, method=method))
+            return drop_prefix(combine(pygdf.concat(dfs).groupby(by=by, method=method)))
 
-        meta = fix_names(combine(chunk(self._df._meta.groupby(by=by)).groupby(by=by)))
+        meta = drop_prefix(chunk(rename(self._df._meta).groupby(by=by)))
+        meta = fix_name(combine(meta.groupby(by=by)))
 
-        parts = self._df.to_delayed()
+        parts = [do_rename(p) for p in self._df.to_delayed()]
         parts = [do_local_groupby(p, method) for p in parts]
         if split_every is not None:
             while len(parts) > 1:
                 tasks, remains = parts[:split_every], parts[split_every:]
                 out = do_combine(tasks, method)
-                parts = apply_name_fix(remains + [out])
+                parts = remains + [out]
         else:
-            parts = apply_name_fix(do_combine(parts, method))
+            parts = do_combine(parts, method)
 
+        parts = [do_fix_name(p) for p in parts]
         return from_delayed(parts, meta=meta).reset_index()
 
         # SHUFFLE VERSION

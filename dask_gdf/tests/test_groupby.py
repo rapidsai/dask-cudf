@@ -274,3 +274,30 @@ def test_groupby_tree_reduce_max(nelem, npart):
 
 
 
+
+@pytest.mark.parametrize('nelem', [50, 100, 1000])
+@pytest.mark.parametrize('npart', [3, 4, 5, 10])
+def test_groupby_tree_reduce_multi_agg(nelem, npart):
+    np.random.seed(0)
+    df = pd.DataFrame()
+    df['a'] = _gen_uniform_keys(nelem)
+    df['b'] = _gen_uniform_keys(nelem)
+    df['c'] = _gen_uniform_keys(nelem)
+
+    ref_df = gd.DataFrame.from_pandas(df)
+    dgf = dgd.from_pygdf(ref_df, npartitions=npart)
+    got = dgf.groupby('a').agg({'b': 'max', 'c': 'min'}).compute().to_pandas()
+    expect = df.groupby('a', as_index=False).agg({'b': 'max', 'c': 'min'})
+
+    pd.util.testing.assert_series_equal(expect.a, got.a)
+    pd.util.testing.assert_series_equal(
+        expect.b,
+        got.max_b,
+        check_names=False,
+        )
+    pd.util.testing.assert_series_equal(
+        expect.c,
+        got.min_c,
+        check_names=False,
+        )
+
