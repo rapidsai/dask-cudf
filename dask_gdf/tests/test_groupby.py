@@ -113,7 +113,7 @@ def check_groupby_agg(agg):
                                          exp.v2)
 
 
-@pytest.mark.parametrize('agg', ['count', 'max', 'min'])
+@pytest.mark.parametrize('agg', ['count', 'sum', 'max', 'min'])
 def test_groupby_agg(agg):
     check_groupby_agg(agg)
 

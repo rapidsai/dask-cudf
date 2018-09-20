@@ -176,7 +176,7 @@ class Groupby(object):
                                  prefix='count')
 
     def sum(self):
-        return self._aggregation(lambda g: g.count(),
+        return self._aggregation(lambda g: g.sum(),
                                  lambda g: g.sum(),
                                  prefix='sum')
 
