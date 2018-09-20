@@ -251,7 +251,6 @@ def test_repeated_groupby():
     pd.util.testing.assert_series_equal(got, expect)
 
 
-
 @pytest.mark.parametrize('nelem', [50, 100, 1000])
 @pytest.mark.parametrize('npart', [3, 4, 5, 10])
 def test_groupby_tree_reduce_max(nelem, npart):
@@ -271,8 +270,6 @@ def test_groupby_tree_reduce_max(nelem, npart):
         got.max_b,
         check_names=False,
         )
-
-
 
 
 @pytest.mark.parametrize('nelem', [50, 100, 1000])
