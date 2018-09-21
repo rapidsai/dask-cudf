@@ -14,12 +14,14 @@ def _make_empty_frame(npartitions=2):
     dgf = dgd.from_pygdf(gdf, npartitions=npartitions)
     return dgf
 
+
 def _make_random_frame(nelem, npartitions=2):
     df = pd.DataFrame({'x': np.random.random(size=nelem),
                        'y': np.random.random(size=nelem)})
     gdf = gd.DataFrame.from_pandas(df)
     dgf = dgd.from_pygdf(gdf, npartitions=npartitions)
     return df, dgf
+
 
 def _make_random_frame_float(nelem, npartitions=2):
     df = pd.DataFrame({'x': np.random.randint(0, 5, size=nelem),
@@ -43,11 +45,13 @@ _binops = [
     operator.le,
 ]
 
+
 @pytest.mark.parametrize('binop', _binops)
 def test_series_binops_empty(binop):
     with pytest.raises(ValueError, match=r'.*size=0.*'):
         gdf = _make_empty_frame()
-        got = binop(gdf.x, gdf.y)
+        binop(gdf.x, gdf.y)
+
 
 @pytest.mark.parametrize('binop', _binops)
 def test_series_binops_integer(binop):
@@ -58,6 +62,7 @@ def test_series_binops_integer(binop):
     got = binop(lhs_gdf.x, rhs_gdf.y)
     exp = binop(lhs_df.x, rhs_df.y)
     np.testing.assert_array_almost_equal(got.compute().to_array(), exp)
+
 
 @pytest.mark.parametrize('binop', _binops)
 def test_series_binops_float(binop):
