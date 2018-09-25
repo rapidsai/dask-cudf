@@ -25,6 +25,7 @@ from dask import compute
 
 from .utils import make_meta, check_meta
 from . import batcher_sortnet, join_impl
+from .accessor import DatetimeAccessor
 
 def optimize(dsk, keys, **kwargs):
     flatkeys = list(flatten(keys)) if isinstance(keys, list) else [keys]
@@ -494,8 +495,8 @@ class DataFrame(_Frame):
             for i in range(len(uniques))[:-1]:
                 intersect = uniques[i] & uniques[i + 1]
                 if intersect:
-                    smaller = min(uniques[i], uniques[i+1], key=len)
-                    bigger = max(uniques[i], uniques[i+1], key=len)
+                    smaller = min(uniques[i], uniques[i + 1], key=len)
+                    bigger = max(uniques[i], uniques[i + 1], key=len)
                     smaller |= intersect
                     bigger -= intersect
                     changed = True
@@ -924,6 +925,11 @@ class Series(_Frame):
                          meta=self._meta, token='unique-k',
                          split_every=split_every, k=k)
 
+    @property
+    def dt(self):
+        """Namespace for datetime methods"""
+        return DatetimeAccessor(self)
+
 
 for op in [operator.abs, operator.add, operator.eq, operator.gt, operator.ge,
            operator.lt, operator.le, operator.mod, operator.mul, operator.ne,
@@ -1040,9 +1046,9 @@ def from_delayed(dfs, meta=None, prefix='from_delayed'):
            for df in dfs]
 
     for df in dfs:
-            if not isinstance(df, Delayed):
-                raise TypeError("Expected Delayed object, got {}".format(
-                                type(df).__name__))
+        if not isinstance(df, Delayed):
+            raise TypeError("Expected Delayed object, got {}".format(
+                            type(df).__name__))
 
     if meta is None:
         meta = dfs[0].compute()
@@ -1277,8 +1283,8 @@ def reduction(args, chunk=None, aggregate=None, combine=None,
         for part_i, inds in enumerate(partition_all(split_every, range(k))):
             conc = (list, [(a, depth, i) for i in inds])
             dsk[(b, depth + 1, part_i)] = (
-                    (apply, combine, [conc], combine_kwargs)
-                    if combine_kwargs else (combine, conc))
+                (apply, combine, [conc], combine_kwargs)
+                if combine_kwargs else (combine, conc))
         k = part_i + 1
         a = b
         depth += 1

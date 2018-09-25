@@ -27,6 +27,8 @@ def _gen_uniform_keys(nelem):
     return xs
 
 
+@pytest.mark.skip(reason="Fix needed from \
+    https://github.com/gpuopenanalytics/dask_gdf/pull/26")
 @pytest.mark.parametrize('keygen', [_gen_skewed_keys, _gen_uniform_keys])
 def test_groupby_single_key(keygen):
     np.random.seed(0)
@@ -54,6 +56,8 @@ def test_groupby_single_key(keygen):
     np.testing.assert_array_equal(got.z, expect.z)
 
 
+@pytest.mark.skip(reason="Fix needed from \
+    https://github.com/gpuopenanalytics/dask_gdf/pull/26")
 @pytest.mark.parametrize('keygen', [_gen_skewed_keys, _gen_uniform_keys])
 def test_groupby_multi_keys(keygen):
     np.random.seed(0)
@@ -86,6 +90,8 @@ def test_groupby_multi_keys(keygen):
     np.testing.assert_array_equal(got.z, expect.z)
 
 
+@pytest.mark.skip(reason="Fix needed from \
+    https://github.com/gpuopenanalytics/dask_gdf/pull/26")
 @pytest.mark.parametrize('agg', ['mean', 'count', 'max', 'min', 'std'])
 def test_groupby_agg(agg):
     np.random.seed(0)
@@ -110,6 +116,9 @@ def test_groupby_agg(agg):
     np.testing.assert_array_almost_equal(got.v2, exp.v2)
 
 
+@pytest.mark.skip(reason="Fix needed from \
+    https://github.com/gpuopenanalytics/dask_gdf/pull/26")
+@pytest.mark.skip(reason="Groupby apply not implemented in libgdf")
 def test_groupby_apply_grouped():
     np.random.seed(0)
 
@@ -160,6 +169,9 @@ def test_groupby_apply_grouped():
                                     getattr(expect, a))
 
 
+@pytest.mark.skip(reason="Fix needed from \
+    https://github.com/gpuopenanalytics/dask_gdf/pull/26")
+@pytest.mark.skip(reason="Groupby apply not implemented in libgdf")
 def test_groupby_apply():
     np.random.seed(0)
 
@@ -202,6 +214,8 @@ def test_groupby_apply():
                                     getattr(expect, a))
 
 
+@pytest.mark.skip(reason="Fix needed from \
+    https://github.com/gpuopenanalytics/dask_gdf/pull/26")
 def test_repeated_groupby():
     np.random.seed(0)
 
