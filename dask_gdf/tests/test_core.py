@@ -291,7 +291,7 @@ def test_setitem_scalar_float(data_type):
 
 def test_setitem_scalar_datetime():
     np.random.seed(0)
-    scalar = np.dtype('datetime64[ms]').type('2017-01-01')
+    scalar = np.random.randint(0, 100).astype('datetime64[ms]')
     df = pd.DataFrame({'x': np.random.randint(0, 5, size=20),
                        'y': np.random.normal(size=20)})
     dgf = dgd.from_pygdf(gd.DataFrame.from_pandas(df), npartitions=2)
