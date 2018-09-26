@@ -2,13 +2,12 @@ import operator
 from uuid import uuid4
 from math import ceil
 from collections import OrderedDict
-from functools import reduce
 
 import numpy as np
 import pandas as pd
 import pygdf as gd
 from libgdf_cffi import libgdf
-from toolz import merge, partition_all, merge_with
+from toolz import merge, partition_all
 
 import dask.dataframe as dd
 from dask.base import tokenize, normalize_token, DaskMethodsMixin
@@ -26,6 +25,7 @@ from dask import compute
 from .utils import make_meta, check_meta
 from . import batcher_sortnet, join_impl
 from .accessor import DatetimeAccessor
+
 
 def optimize(dsk, keys, **kwargs):
     flatkeys = list(flatten(keys)) if isinstance(keys, list) else [keys]
@@ -1308,4 +1308,3 @@ def reduction(args, chunk=None, aggregate=None, combine=None,
             dsk.update(arg.dask)
 
     return new_dd_object(dsk, b, meta, (None, None))
-

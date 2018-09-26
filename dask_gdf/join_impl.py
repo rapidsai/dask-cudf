@@ -2,7 +2,6 @@ from functools import partial
 
 import numpy as np
 import pygdf as gd
-from numba import cuda
 from dask import delayed
 import dask_gdf
 
@@ -121,7 +120,7 @@ def join_frames(left, right, on, how, lsuffix, rsuffix):
     fix_name = partial(_fix_name, same_names=same_names)
     if same_names and not (lsuffix or rsuffix):
         raise ValueError('there are overlapping columns but '
-                            'lsuffix and rsuffix are not defined')
+                         'lsuffix and rsuffix are not defined')
 
     dtypes = {k: left[k].dtype for k in left.columns}
     dtypes.update({k: right[k].dtype for k in right.columns})

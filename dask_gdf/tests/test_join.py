@@ -122,7 +122,8 @@ def test_join_left(left_nrows, right_nrows, left_nkeys, right_nkeys, how):
 @pytest.mark.parametrize('right_nrows', param_nrows)
 @pytest.mark.parametrize('left_nkeys', [4, 5])
 @pytest.mark.parametrize('right_nkeys', [4, 5])
-def test_merge_left(left_nrows, right_nrows, left_nkeys, right_nkeys, how='left'):
+def test_merge_left(left_nrows, right_nrows, left_nkeys, right_nkeys,
+                    how='left'):
     print(left_nrows, right_nrows, left_nkeys, right_nkeys)
     chunksize = 3
 
@@ -145,9 +146,10 @@ def test_merge_left(left_nrows, right_nrows, left_nkeys, right_nkeys, how='left'
     print(right.to_pandas())
 
     expect = left.merge(right, on=('x', 'y'), how=how)
-    expect = expect.to_pandas().sort_values(['x', 'y', 'a_x', 'a_y']).reset_index(drop=True)
+    expect = expect.to_pandas().sort_values(['x', 'y', 'a_x', 'a_y'])\
+        .reset_index(drop=True)
 
-    print("Expect".center(80,'='))
+    print("Expect".center(80, '='))
     print(expect)
 
     # Dask GDf
@@ -156,7 +158,7 @@ def test_merge_left(left_nrows, right_nrows, left_nkeys, right_nkeys, how='left'
 
     joined = left.merge(right, on=('x', 'y'), how=how)
 
-    print("Got".center(80,'='))
+    print("Got".center(80, '='))
     got = joined.compute().to_pandas()
 
     got = got.sort_values(['x', 'y', 'a_x', 'a_y']).reset_index(drop=True)
@@ -165,13 +167,12 @@ def test_merge_left(left_nrows, right_nrows, left_nkeys, right_nkeys, how='left'
     pd.util.testing.assert_frame_equal(expect, got)
 
 
-
-
 @pytest.mark.parametrize('left_nrows', [2, 5])
 @pytest.mark.parametrize('right_nrows', [5, 10])
 @pytest.mark.parametrize('left_nkeys', [4])
 @pytest.mark.parametrize('right_nkeys', [4])
-def test_merge_1col_left(left_nrows, right_nrows, left_nkeys, right_nkeys, how='left'):
+def test_merge_1col_left(left_nrows, right_nrows, left_nkeys, right_nkeys,
+                         how='left'):
     print(left_nrows, right_nrows, left_nkeys, right_nkeys)
     chunksize = 3
 
@@ -190,9 +191,10 @@ def test_merge_1col_left(left_nrows, right_nrows, left_nkeys, right_nkeys, how='
     print(right.to_pandas())
 
     expect = left.merge(right, on=['x'], how=how)
-    expect = expect.to_pandas().sort_values(['x', 'a_x', 'a_y']).reset_index(drop=True)
+    expect = expect.to_pandas().sort_values(['x', 'a_x', 'a_y'])\
+        .reset_index(drop=True)
 
-    print("Expect".center(80,'='))
+    print("Expect".center(80, '='))
     print(expect)
 
     # Dask GDf
@@ -201,11 +203,10 @@ def test_merge_1col_left(left_nrows, right_nrows, left_nkeys, right_nkeys, how='
 
     joined = left.merge(right, on=['x'], how=how)
 
-    print("Got".center(80,'='))
+    print("Got".center(80, '='))
     got = joined.compute().to_pandas()
 
     got = got.sort_values(['x', 'a_x', 'a_y']).reset_index(drop=True)
     print(got)
 
     pd.util.testing.assert_frame_equal(expect, got)
-
