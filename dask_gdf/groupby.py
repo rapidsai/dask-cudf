@@ -110,7 +110,8 @@ class Groupby(object):
 
         @delayed
         def do_combine(dfs, method):
-            return drop_prefix(combine(pygdf.concat(dfs).groupby(by=by, method=method)))
+            return drop_prefix(combine(pygdf.concat(dfs).groupby(
+                by=by, method=method)))
 
         meta = drop_prefix(chunk(rename(self._df._meta).groupby(by=by)))
         meta = fix_name(combine(meta.groupby(by=by)))

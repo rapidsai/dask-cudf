@@ -297,4 +297,3 @@ def test_groupby_tree_reduce_multi_agg(nelem, npart):
         got.min_c,
         check_names=False,
         )
-
