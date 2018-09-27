@@ -909,18 +909,11 @@ class Series(_Frame):
                          meta=self._meta, token='unique-k',
                          split_every=split_every, k=k)
 
+    # ----------------------------------------------------------------------
+    # Accessor Methods
+    # ----------------------------------------------------------------------
     dt = CachedAccessor("dt", DatetimeAccessor)
     cat = CachedAccessor("cat", CategoricalAccessor)
-
-    # @property
-    # def dt(self):
-    #    """Namespace for datetime methods"""
-    #    return DatetimeAccessor(self)
-
-    # @property
-    # def cat(self):
-    #    """Namespace for categorical methods"""
-    #    return CategoricalAccessor(self)
 
 
 for op in [operator.abs, operator.add, operator.eq, operator.gt, operator.ge,

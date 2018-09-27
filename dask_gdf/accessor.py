@@ -112,7 +112,7 @@ class CachedAccessor(object):
         # http://www.pydanny.com/cached-property.html
         # We need to use object.__setattr__ because we overwrite __setattr__ on
         # NDFrame
-        object.__setattr__(obj, self._name, accessor_obj)
+        # object.__setattr__(obj, self._name, accessor_obj)
         return accessor_obj
 
 
