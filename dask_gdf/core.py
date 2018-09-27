@@ -912,12 +912,16 @@ class Series(_Frame):
     @property
     def dt(self):
         """Namespace for datetime methods"""
-        return DatetimeAccessor(self)
+        if self._accessor is None:
+            self._accessor = DatetimeAccessor(self)
+        return self._accessor
 
     @property
     def cat(self):
         """Namespace for categorical methods"""
-        return CategoricalAccessor(self)
+        if self._accessor is None:
+            self._accessor = CategoricalAccessor(self)
+        return self._accessor
 
 
 for op in [operator.abs, operator.add, operator.eq, operator.gt, operator.ge,

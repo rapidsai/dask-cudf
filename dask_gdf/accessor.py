@@ -104,9 +104,9 @@ class CategoricalAccessor(Accessor):
     of Categorical type.
     """
 
-    from pygdf.categorical import CategoricalAccessor as gdfCategoricalAccessor
+    from pygdf.categorical import CategoricalAccessor as GdfCategoricalAccessor
 
-    _accessor = gdfCategoricalAccessor
+    _accessor = GdfCategoricalAccessor
     _accessor_name = 'cat'
 
     def _validate(self, series):
