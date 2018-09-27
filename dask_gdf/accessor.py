@@ -1,3 +1,10 @@
+# Copyright (c) 2008-2012, AQR Capital Management, LLC, Lambda Foundry, Inc.
+# and PyData Development Team
+# All rights reserved.
+
+# Copyright (c) 2014-2018, Anaconda, Inc. and contributors
+# All rights reserved.
+
 """
 
 accessor.py contains classes for implementing
@@ -83,7 +90,7 @@ class Accessor(object):
         else:
             raise AttributeError(key)
 
-# Stolen from
+# Adapted from
 # https://github.com/pandas-dev/pandas/blob/master/pandas/core/accessor.py
 
 
