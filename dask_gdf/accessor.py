@@ -14,6 +14,11 @@ accessor properties.
 
 from toolz import partial
 import pygdf as gd
+from pygdf.series import DatetimeProperties
+from pygdf.categorical import CategoricalAccessor as GdfCategoricalAccessor
+
+# Adapted from
+# https://github.com/dask/dask/blob/master/dask/dataframe/accessor.py
 
 
 class Accessor(object):
@@ -121,8 +126,6 @@ class DatetimeAccessor(Accessor):
     """ Accessor object for datetimelike properties of the Series values.
     """
 
-    from pygdf.series import DatetimeProperties
-
     _accessor = DatetimeProperties
     _accessor_name = 'dt'
 
@@ -136,8 +139,6 @@ class CategoricalAccessor(Accessor):
     """ Accessor object for categorical properties of the Series values
     of Categorical type.
     """
-
-    from pygdf.categorical import CategoricalAccessor as GdfCategoricalAccessor
 
     _accessor = GdfCategoricalAccessor
     _accessor_name = 'cat'
