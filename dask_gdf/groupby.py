@@ -9,10 +9,13 @@ from .core import from_delayed
 class Groupby(object):
     """The object returned by ``df.groupby()``.
     """
-    def __init__(self, df, by):
+    _magic_token = '__@__'
+
+    def __init__(self, df, by, method):
         self._df = df
         self._by = tuple([by]) if isinstance(by, str) else tuple(by)
         self._grouped_cache = None
+        self._method = method
 
     @property
     def _grouped(self):
@@ -36,39 +39,94 @@ class Groupby(object):
 
         # Second, do groupby internally for each partition.
         @delayed
-        def _groupby(df, by):
-            grouped = df.groupby(by=by)
+        def _groupby(df, by, method):
+            grouped = df.groupby(by=by, method=method)
             return grouped
 
         # Get the groupby objects
-        grouped = [_groupby(g, self._by) for g in groups]
+        grouped = [_groupby(g, self._by, self._method) for g in groups]
         return grouped
 
     def agg(self, mapping):
-        return self._aggregation(lambda df: df.agg(mapping),
-                                 lambda df: df.agg(mapping))
+        # Define how columns should be prefixed
+        prefix = {}
+        for key, val in mapping.items():
+            prefix[key] = val
+        # Adjust *mapping* for custom prefix.
+        mapping = {self._magic_token + k: v for k, v in mapping.items()}
+        return self._aggregation(
+            lambda df: df.agg(mapping),
+            lambda df: df.agg(mapping),
+            prefix=prefix,
+            )
 
-    def _aggregation(self, chunk, combine, split_every=4):
+    def _aggregation(self, chunk, combine, split_every=4, prefix=''):
         by = self._by
+        method = self._method
+        magic_token = self._magic_token
+        valcols = set(self._df.columns) - set(self._by)
+
+        if isinstance(prefix, str):
+            prefix = {k: prefix for k in valcols}
+
+        def rename(df):
+            # Rename columns with magic_token as prefix
+            newdf = pygdf.DataFrame()
+            for k in df.columns:
+                newk = magic_token + k if k in valcols else k
+                newdf[newk] = df[k]
+            return newdf
+
+        do_rename = delayed(rename)
+
+        def fix_name(df):
+            # Undo rename(df) and apply proper prefix base on column name
+            newdf = pygdf.DataFrame()
+            for k in df.columns:
+                if magic_token in k:
+                    _, name = k.split(magic_token, 1)
+                    newk = '_'.join([prefix[name], name])
+                else:
+                    newk = k
+                newdf[newk] = df[k]
+            return newdf
+
+        do_fix_name = delayed(fix_name)
+
+        def drop_prefix(df):
+            newdf = pygdf.DataFrame()
+            for k in df.columns:
+                if magic_token in k:
+                    _, name = k.split(magic_token, 1)
+                    newk = magic_token + name
+                else:
+                    newk = k
+                newdf[newk] = df[k]
+            return newdf
 
         @delayed
-        def do_local_groupby(df):
-            return chunk(df.groupby(by=by))
+        def do_local_groupby(df, method):
+            return drop_prefix(chunk(df.groupby(by=by, method=method)))
 
         @delayed
-        def do_combine(dfs):
-            return combine(pygdf.concat(dfs).groupby(by=by))
+        def do_combine(dfs, method):
+            return drop_prefix(combine(pygdf.concat(dfs).groupby(
+                by=by, method=method)))
 
-        parts = self._df.to_delayed()
-        parts = [do_local_groupby(p) for p in parts]
+        meta = drop_prefix(chunk(rename(self._df._meta).groupby(by=by)))
+        meta = fix_name(combine(meta.groupby(by=by)))
+
+        parts = [do_rename(p) for p in self._df.to_delayed()]
+        parts = [do_local_groupby(p, method) for p in parts]
         if split_every is not None:
             while len(parts) > 1:
                 tasks, remains = parts[:split_every], parts[split_every:]
-                out = do_combine(tasks)
+                out = do_combine(tasks, method)
                 parts = remains + [out]
         else:
-            parts = do_combine(parts)
-        meta = combine(chunk(self._df._meta.groupby(by=by)).groupby(by=by))
+            parts = do_combine(parts, method)
+
+        parts = [do_fix_name(p) for p in parts]
         return from_delayed(parts, meta=meta).reset_index()
 
         # SHUFFLE VERSION
@@ -115,11 +173,13 @@ class Groupby(object):
 
     def count(self):
         return self._aggregation(lambda g: g.count(),
-                                 lambda g: g.sum())
+                                 lambda g: g.sum(),
+                                 prefix='count')
 
     def sum(self):
-        return self._aggregation(lambda g: g.count(),
-                                 lambda g: g.sum())
+        return self._aggregation(lambda g: g.sum(),
+                                 lambda g: g.sum(),
+                                 prefix='sum')
 
     def mean(self):
         valcols = set(self._df.columns) - set(self._by)
@@ -134,15 +194,18 @@ class Groupby(object):
 
         return self._aggregation(lambda g: g.agg(['sum', 'count']),
                                  lambda g: g.apply(combine),
-                                 split_every=None)
+                                 split_every=None,
+                                 prefix='mean')
 
     def max(self):
         return self._aggregation(lambda g: g.max(),
-                                 lambda g: g.max())
+                                 lambda g: g.max(),
+                                 prefix='max')
 
     def min(self):
         return self._aggregation(lambda g: g.min(),
-                                 lambda g: g.min())
+                                 lambda g: g.min(),
+                                 prefix='min')
 
     def _compute_std_or_var(self, ddof=1, do_std=False):
         valcols = set(self._df.columns) - set(self._by)
