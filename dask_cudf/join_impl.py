@@ -4,7 +4,7 @@ import numpy as np
 import cudf as gd
 from dask import delayed
 
-from dask_cudf import from_delayed
+from dask_cudf import core
 
 
 @delayed
@@ -150,7 +150,7 @@ def join_frames(left, right, on, how, lsuffix, rsuffix):
     merged = [delayed(merge)(left_cats[i], right_cats[i])
               for i in range(nparts)]
 
-    return from_delayed(merged, prefix='join_result', meta=empty_frame)
+    return core.from_delayed(merged, prefix='join_result', meta=empty_frame)
 
 
 def _fix_name(k, suffix, same_names):
