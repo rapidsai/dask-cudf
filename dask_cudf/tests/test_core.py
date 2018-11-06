@@ -251,7 +251,7 @@ def test_assign():
     dgf = dgd.from_cudf(gd.DataFrame.from_pandas(df), npartitions=2)
     pdcol = pd.Series(np.arange(20) + 1000)
     newcol = dgd.from_cudf(gd.Series(pdcol),
-                            npartitions=dgf.npartitions)
+                           npartitions=dgf.npartitions)
     out = dgf.assign(z=newcol)
 
     got = out.compute().to_pandas()
