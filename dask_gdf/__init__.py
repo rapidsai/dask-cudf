@@ -1,4 +1,4 @@
-from .core import DataFrame, Series, from_pygdf, from_dask_dataframe, concat, \
+from .core import DataFrame, Series, from_cudf, from_dask_dataframe, concat, \
     from_delayed
 
 from ._version import get_versions
@@ -8,7 +8,7 @@ del get_versions
 __all__ = [
     "DataFrame",
     "Series",
-    "from_pygdf",
+    "from_cudf",
     "from_dask_dataframe",
     "concat",
     "from_delayed",

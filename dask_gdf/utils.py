@@ -1,18 +1,18 @@
 import pandas as pd
-import pygdf as gd
+import cudf as gd
 import dask.dataframe as dd
 from dask.utils import asciitable
 
 
 def make_meta(x):
-    """Create an empty pygdf object containing the desired metadata.
+    """Create an empty cudf object containing the desired metadata.
 
     Parameters
     ----------
     x : dict, tuple, list, pd.Series, pd.DataFrame, pd.Index, dtype, scalar
         To create a DataFrame, provide a `dict` mapping of `{name: dtype}`, or
         an iterable of `(name, dtype)` tuples. To create a `Series`, provide a
-        tuple of `(name, dtype)`. If a pygdf object, names, dtypes, and index
+        tuple of `(name, dtype)`. If a cudf object, names, dtypes, and index
         should match the desired output. If a dtype or scalar, a scalar of the
         same dtype is returned.
 
@@ -67,7 +67,7 @@ def check_meta(x, meta, funcname=None):
 
     if not isinstance(meta, (gd.Series, gd.index.Index, gd.DataFrame)):
         raise TypeError("Expected partition to be DataFrame, Series, or "
-                        "Index of pygdf, got `%s`" % type(meta).__name__)
+                        "Index of cudf, got `%s`" % type(meta).__name__)
 
     if type(x) != type(meta):
         errmsg = ("Expected partition of type `%s` but got "
@@ -105,7 +105,7 @@ def series_type_eq(a, b):
 
     Parameters
     ----------
-    a, b : pygdf.Series
+    a, b : cudf.Series
 
     Returns
     -------

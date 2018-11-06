@@ -1,9 +1,10 @@
 from functools import partial
 
 import numpy as np
-import pygdf as gd
+import cudf as gd
 from dask import delayed
-import dask_gdf
+
+from .core import from_delayed
 
 
 @delayed
@@ -53,7 +54,7 @@ def join_frames(left, right, on, how, lsuffix, rsuffix):
 
     Parameters
     ----------
-    left, right : dask_gdf.DataFrame
+    left, right : dask-cudf.DataFrame
     on : tuple[str]
         key column(s)
     how : str
@@ -100,15 +101,15 @@ def join_frames(left, right, on, how, lsuffix, rsuffix):
 
     def merge(left, right):
         if left is None and right is None:
-            # FIXME: this should go inside pygdf so it can merge two empty
+            # FIXME: this should go inside cudf so it can merge two empty
             #        frames
             return empty_frame
         elif left is None:
-            # FIXME: this should go inside pygdf so it can merge empty frames
+            # FIXME: this should go inside cudf so it can merge empty frames
             #        left frames
             return empty_frame
         elif right is None:
-            # FIXME: this should go inside pygdf so it can merge empty frames
+            # FIXME: this should go inside cudf so it can merge empty frames
             #        right frames
             return fix_left(left)
         else:
@@ -149,8 +150,7 @@ def join_frames(left, right, on, how, lsuffix, rsuffix):
     merged = [delayed(merge)(left_cats[i], right_cats[i])
               for i in range(nparts)]
 
-    return dask_gdf.from_delayed(merged, prefix='join_result',
-                                 meta=empty_frame)
+    return from_delayed(merged, prefix='join_result', meta=empty_frame)
 
 
 def _fix_name(k, suffix, same_names):

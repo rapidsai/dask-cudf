@@ -7,7 +7,7 @@ from collections import OrderedDict
 
 import numpy as np
 import pandas as pd
-import pygdf as gd
+import cudf as gd
 from libgdf_cffi import libgdf
 from toolz import merge, partition_all
 
@@ -52,8 +52,8 @@ class _Frame(DaskMethodsMixin, OperatorMethodMixin):
     name : str
         The key prefix that specifies which keys in the dask comprise this
         particular DataFrame / Series
-    meta : pygdf.DataFrame, pygdf.Series, or pygdf.Index
-        An empty pygdf object with names, dtypes, and indices matching the
+    meta : cudf.DataFrame, cudf.Series, or cudf.Index
+        An empty cudf object with names, dtypes, and indices matching the
         expected output.
     divisions : tuple of index values
         Values along which we partition our blocks on the index
@@ -91,7 +91,7 @@ class _Frame(DaskMethodsMixin, OperatorMethodMixin):
         self.dask, self._name, self._meta, self.divisions = state
 
     def __repr__(self):
-        s = "<dask_gdf.%s | %d tasks | %d npartitions>"
+        s = "<dask-cudf.%s | %d tasks | %d npartitions>"
         return s % (type(self).__name__, len(self.dask), self.npartitions)
 
     @property
@@ -181,14 +181,14 @@ class _Frame(DaskMethodsMixin, OperatorMethodMixin):
         return res.compute() if compute else res
 
     def to_dask_dataframe(self):
-        """Create a dask.dataframe object from a dask_gdf object"""
+        """Create a dask.dataframe object from a dask-cudf object"""
         meta = self._meta.to_pandas()
         dummy = self.map_partitions(M.to_pandas, meta=self._meta)
         return dd.core.new_dd_object(dummy.dask, dummy._name, meta,
                                      dummy.divisions)
 
     def to_delayed(self):
-        """See dask_gdf.to_delayed docstring for more information."""
+        """See dask-cudf.to_delayed docstring for more information."""
         return to_delayed(self)
 
     def append(self, other):
@@ -198,7 +198,7 @@ class _Frame(DaskMethodsMixin, OperatorMethodMixin):
 
 
 def _daskify(obj, npartitions=None, chunksize=None):
-    """Convert input to a dask-gdf object.
+    """Convert input to a dask-cudf object.
     """
     npartitions = npartitions or 1
     if isinstance(obj, _Frame):
@@ -206,7 +206,7 @@ def _daskify(obj, npartitions=None, chunksize=None):
     elif isinstance(obj, (pd.DataFrame, pd.Series, pd.Index)):
         return _daskify(dd.from_pandas(obj, npartitions=npartitions))
     elif isinstance(obj, (gd.DataFrame, gd.Series, gd.index.Index)):
-        return from_pygdf(obj, npartitions=npartitions)
+        return from_cudf(obj, npartitions=npartitions)
     elif isinstance(obj, (dd.DataFrame, dd.Series, dd.Index)):
         return from_dask_dataframe(obj)
     else:
@@ -249,7 +249,7 @@ def stack_partitions(dfs, divisions):
 
 
 def concat(objs, interleave_partitions=False):
-    """Concantenate dask gdf objects
+    """Concantenate dask-cudf objects
 
     Parameters
     ----------
@@ -656,7 +656,7 @@ class DataFrame(_Frame):
             tmpdf = self.sort_values(index)
             return tmpdf._set_column_as_sorted_index(index, drop=drop)
         elif isinstance(index, Series):
-            indexname = '__dask_gdf.index'
+            indexname = '__dask-cudf.index'
             df = self.assign(**{indexname: index})
             return df.set_index(indexname, drop=drop, sorted=sorted)
         else:
@@ -994,7 +994,7 @@ class Index(Series):
         raise AttributeError("'Index' object has no attribute 'index'")
 
 
-def splits_divisions_sorted_pygdf(df, chunksize):
+def splits_divisions_sorted_cudf(df, chunksize):
     segments = list(df.index.find_segments().to_array())
     segments.append(len(df) - 1)
 
@@ -1016,12 +1016,12 @@ def splits_divisions_sorted_pygdf(df, chunksize):
     return splits, divisions
 
 
-def from_pygdf(data, npartitions=None, chunksize=None, sort=True, name=None):
-    """Create a dask_gdf from a pygdf object
+def from_cudf(data, npartitions=None, chunksize=None, sort=True, name=None):
+    """Create a dask-cudf from a cudf object
 
     Parameters
     ----------
-    data : pygdf.DataFrame or pygdf.Series
+    data : cudf.DataFrame or cudf.Series
     npartitions : int, optional
         The number of partitions of the index to create. Note that depending on
         the size and index of the dataframe, the output may have fewer
@@ -1036,11 +1036,11 @@ def from_pygdf(data, npartitions=None, chunksize=None, sort=True, name=None):
 
     Returns
     -------
-    dask_gdf.DataFrame or dask_gdf.Series
-        A dask_gdf DataFrame/Series partitioned along the index
+    dask-cudf.DataFrame or dask-cudf.Series
+        A dask-cudf DataFrame/Series partitioned along the index
     """
     if not isinstance(data, (gd.Series, gd.DataFrame)):
-        raise TypeError("Input must be a pygdf DataFrame or Series")
+        raise TypeError("Input must be a cudf DataFrame or Series")
 
     if ((npartitions is None) == (chunksize is None)):
         raise ValueError('Exactly one of npartitions and chunksize must '
@@ -1051,11 +1051,11 @@ def from_pygdf(data, npartitions=None, chunksize=None, sort=True, name=None):
     if chunksize is None:
         chunksize = int(ceil(nrows / npartitions))
 
-    name = name or ('from_pygdf-' + uuid4().hex)
+    name = name or ('from_cudf-' + uuid4().hex)
 
     if sort:
         data = data.sort_index(ascending=True)
-        splits, divisions = splits_divisions_sorted_pygdf(data, chunksize)
+        splits, divisions = splits_divisions_sorted_cudf(data, chunksize)
     else:
         splits = list(range(0, nrows, chunksize)) + [len(data)]
         divisions = (None,) * len(splits)
@@ -1071,15 +1071,15 @@ def _from_pandas(df):
 
 
 def from_delayed(dfs, meta=None, prefix='from_delayed'):
-    """ Create Dask GDF DataFrame from many Dask Delayed objects
+    """ Create dask-cudf DataFrame from many Dask Delayed objects
     Parameters
     ----------
     dfs : list of Delayed
         An iterable of ``dask.delayed.Delayed`` objects, such as come from
         ``dask.delayed`` These comprise the individual partitions of the
         resulting dataframe.
-    meta : pygdf.DataFrame, pygdf.Series, or pygdf.Index
-        An empty pygdf object with names, dtypes, and indices matching the
+    meta : cudf.DataFrame, cudf.Series, or cudf.Index
+        An empty cudf object with names, dtypes, and indices matching the
         expected output.
     prefix : str, optional
         Prefix to prepend to the keys.
@@ -1116,7 +1116,7 @@ def from_delayed(dfs, meta=None, prefix='from_delayed'):
 
 
 def to_delayed(df):
-    """ Create Dask Delayed objects from a Dask GDF Dataframe
+    """ Create Dask Delayed objects from a dask-cudf Dataframe
     Returns a list of delayed values, one value per partition.
     """
     from dask.delayed import Delayed
@@ -1127,7 +1127,7 @@ def to_delayed(df):
 
 
 def from_dask_dataframe(df):
-    """Create a `dask_gdf.DataFrame` from a `dask.dataframe.DataFrame`
+    """Create a `dask-cudf.DataFrame` from a `dask.dataframe.DataFrame`
 
     Parameters
     ----------
@@ -1135,7 +1135,7 @@ def from_dask_dataframe(df):
     """
     bad_cols = df.select_dtypes(include=['O'])
     if len(bad_cols.columns):
-        raise ValueError("Object dtypes aren't supported by pygdf")
+        raise ValueError("Object dtypes aren't supported by cudf")
 
     meta = _from_pandas(df._meta)
     dummy = DataFrame(df.dask, df._name, meta, df.divisions)
@@ -1158,7 +1158,7 @@ def new_dd_object(dsk, name, meta, divisions):
 
 def _extract_meta(x):
     """
-    Extract internal cache data (``_meta``) from dask_gdf objects
+    Extract internal cache data (``_meta``) from dask-cudf objects
     """
     if isinstance(x, (Scalar, _Frame)):
         return x._meta
@@ -1181,7 +1181,7 @@ def _emulate(func, *args, **kwargs):
 
 
 def align_partitions(args):
-    """Align partitions between dask_gdf objects.
+    """Align partitions between dask-cudf objects.
 
     Note that if all divisions are unknown, but have equal npartitions, then
     they will be passed through unchanged."""
@@ -1204,7 +1204,7 @@ def map_partitions(func, *args, **kwargs):
         Function applied to each partition.
     args, kwargs :
         Arguments and keywords to pass to the function. At least one of the
-        args should be a dask_gdf object.
+        args should be a dask-cudf object.
     """
     meta = kwargs.pop('meta', None)
     if meta is not None:

@@ -1,7 +1,7 @@
 import numpy as np
 
 from dask.delayed import delayed
-import pygdf
+import cudf as gd
 
 from .core import from_delayed
 
@@ -71,7 +71,7 @@ class Groupby(object):
 
         def rename(df):
             # Rename columns with magic_token as prefix
-            newdf = pygdf.DataFrame()
+            newdf = gd.DataFrame()
             for k in df.columns:
                 newk = magic_token + k if k in valcols else k
                 newdf[newk] = df[k]
@@ -81,7 +81,7 @@ class Groupby(object):
 
         def fix_name(df):
             # Undo rename(df) and apply proper prefix base on column name
-            newdf = pygdf.DataFrame()
+            newdf = gd.DataFrame()
             for k in df.columns:
                 if magic_token in k:
                     _, name = k.split(magic_token, 1)
@@ -94,7 +94,7 @@ class Groupby(object):
         do_fix_name = delayed(fix_name)
 
         def drop_prefix(df):
-            newdf = pygdf.DataFrame()
+            newdf = gd.DataFrame()
             for k in df.columns:
                 if magic_token in k:
                     _, name = k.split(magic_token, 1)
@@ -110,7 +110,7 @@ class Groupby(object):
 
         @delayed
         def do_combine(dfs, method):
-            return drop_prefix(combine(pygdf.concat(dfs).groupby(
+            return drop_prefix(combine(gd.concat(dfs).groupby(
                 by=by, method=method)))
 
         meta = drop_prefix(chunk(rename(self._df._meta).groupby(by=by)))
@@ -160,7 +160,7 @@ class Groupby(object):
     def apply_grouped(self, *args, **kwargs):
         """Transform each group using a GPU function.
 
-        Calls ``pygdf.Groupby.apply_grouped`` concurrently
+        Calls ``cudf.Groupby.apply_grouped`` concurrently
         """
         @delayed
         def apply_to_group(grp):
