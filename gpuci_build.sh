@@ -3,7 +3,7 @@ set -e
 LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda/lib64:/usr/local/lib
 CC=/usr/bin/gcc
 CXX=/usr/bin/g++
-DASKCUDF_REPO=https://github.com/rapidsai/dask-cudf
+DASKCUDF_REPO=https://github.com/rapidsai/dask_cudf
 NUMBA_VERSION=0.40.0
 NUMPY_VERSION=1.14.5
 PANDAS_VERSION=0.20.3
@@ -42,17 +42,17 @@ gcc --version
 g++ --version
 conda list
 
-logger "Clone dask-cudf..."
+logger "Clone dask_cudf..."
 rm -rf $WORKSPACE/daskcudf
 git clone --recurse-submodules ${DASKCUDF_REPO} $WORKSPACE/daskcudf
 
 
-logger "Build dask-cudf..."
+logger "Build dask_cudf..."
 cd $WORKSPACE
 python setup.py install
 
 logger "Check GPU usage..."
 nvidia-smi
 
-logger "Test dask-cudf..."
+logger "Test dask_cudf..."
 py.test --cache-clear --junitxml=junit.xml --ignore=daskcudf -v

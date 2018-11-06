@@ -6,8 +6,8 @@ from pandas.util.testing import assert_frame_equal
 
 import pytest
 
-import pygdf as gd
-import dask_gdf as dgd
+import cudf as gd
+import dask_cudf as dgd
 from dask.delayed import delayed
 
 
@@ -52,7 +52,7 @@ def test_dataframe_to_delayed():
     df['x'] = np.arange(nelem)
     df['y'] = np.random.randint(nelem, size=nelem)
 
-    ddf = dgd.from_pygdf(df, npartitions=5)
+    ddf = dgd.from_cudf(df, npartitions=5)
 
     delays = ddf.to_delayed()
 
@@ -80,7 +80,7 @@ def test_series_to_delayed():
 
     sr = gd.Series(np.random.randint(nelem, size=nelem))
 
-    dsr = dgd.from_pygdf(sr, npartitions=5)
+    dsr = dgd.from_cudf(sr, npartitions=5)
 
     delays = dsr.to_delayed()
 
@@ -111,7 +111,7 @@ def test_mixing_series_frame_error():
     df['x'] = np.arange(nelem)
     df['y'] = np.random.randint(nelem, size=nelem)
 
-    ddf = dgd.from_pygdf(df, npartitions=5)
+    ddf = dgd.from_cudf(df, npartitions=5)
 
     delay_frame = ddf.to_delayed()
     delay_series = ddf.x.to_delayed()
@@ -130,10 +130,10 @@ def test_frame_extra_columns_error():
     df = gd.DataFrame()
     df['x'] = np.arange(nelem)
     df['y'] = np.random.randint(nelem, size=nelem)
-    ddf1 = dgd.from_pygdf(df, npartitions=5)
+    ddf1 = dgd.from_cudf(df, npartitions=5)
 
     df['z'] = np.arange(nelem)
-    ddf2 = dgd.from_pygdf(df, npartitions=5)
+    ddf2 = dgd.from_cudf(df, npartitions=5)
 
     combined = dgd.from_delayed(ddf1.to_delayed() + ddf2.to_delayed())
 
@@ -155,8 +155,8 @@ def test_frame_dtype_error():
     df2['bad'] = np.arange(nelem)
     df2['bad'] = np.arange(nelem, dtype=np.float32)
 
-    ddf1 = dgd.from_pygdf(df1, npartitions=5)
-    ddf2 = dgd.from_pygdf(df2, npartitions=5)
+    ddf1 = dgd.from_cudf(df1, npartitions=5)
+    ddf2 = dgd.from_cudf(df2, npartitions=5)
 
     combined = dgd.from_delayed(ddf1.to_delayed() + ddf2.to_delayed())
 

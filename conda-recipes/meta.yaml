@@ -1,7 +1,7 @@
 # Usage:
 #   conda build -c defaults -c conda-forge .
 package:
-  name: dask-cudf
+  name: dask_cudf
   version: {{ environ.get('GIT_DESCRIBE_TAG', '0.0.0.dev').lstrip('v') }}
 
 source:
@@ -21,7 +21,7 @@ requirements:
     - pandas 0.20.3
 test:
   imports:
-    - dask-cudf
+    - dask_cudf
 
 about:
   home: http://rapids.ai

@@ -26,8 +26,8 @@ install:
   # install conda build
   - conda install conda-build anaconda-client flake8 --yes
 script:
-  # build dask-cudf
-  - source ./travisci/build_dask-cudf.sh
+  # build dask_cudf
+  - source ./travisci/build_dask_cudf.sh
   - flake8
 
 after_success:

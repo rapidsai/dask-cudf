@@ -2,8 +2,8 @@ import pytest
 
 import numpy as np
 
-import pygdf
-from dask_gdf import batcher_sortnet
+import cudf
+from dask_cudf import batcher_sortnet
 
 
 @pytest.mark.parametrize('n', list(range(1, 40)))
@@ -23,12 +23,12 @@ def test_compare_frame(seed, nelem):
     np.random.seed(seed)
     max_part_size = nelem
     # Make LHS
-    lhs = pygdf.DataFrame()
+    lhs = cudf.DataFrame()
     lhs['a'] = lhs_a = np.random.random(nelem)
     lhs['b'] = lhs_b = np.random.random(nelem)
 
     # Make RHS
-    rhs = pygdf.DataFrame()
+    rhs = cudf.DataFrame()
     rhs['a'] = rhs_a = np.random.random(nelem)
     rhs['b'] = rhs_b = np.random.random(nelem)
 
@@ -50,7 +50,7 @@ def test_compare_frame(seed, nelem):
 
 
 def test_compare_frame_with_none():
-    df = pygdf.DataFrame()
+    df = cudf.DataFrame()
     max_part_size = 1
     df['a'] = [0]
     res = batcher_sortnet._compare_frame(df, None, max_part_size, by='a')

@@ -54,7 +54,7 @@ def join_frames(left, right, on, how, lsuffix, rsuffix):
 
     Parameters
     ----------
-    left, right : dask-cudf.DataFrame
+    left, right : dask_cudf.DataFrame
     on : tuple[str]
         key column(s)
     how : str

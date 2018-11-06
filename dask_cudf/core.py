@@ -91,7 +91,7 @@ class _Frame(DaskMethodsMixin, OperatorMethodMixin):
         self.dask, self._name, self._meta, self.divisions = state
 
     def __repr__(self):
-        s = "<dask-cudf.%s | %d tasks | %d npartitions>"
+        s = "<dask_cudf.%s | %d tasks | %d npartitions>"
         return s % (type(self).__name__, len(self.dask), self.npartitions)
 
     @property
@@ -181,14 +181,14 @@ class _Frame(DaskMethodsMixin, OperatorMethodMixin):
         return res.compute() if compute else res
 
     def to_dask_dataframe(self):
-        """Create a dask.dataframe object from a dask-cudf object"""
+        """Create a dask.dataframe object from a dask_cudf object"""
         meta = self._meta.to_pandas()
         dummy = self.map_partitions(M.to_pandas, meta=self._meta)
         return dd.core.new_dd_object(dummy.dask, dummy._name, meta,
                                      dummy.divisions)
 
     def to_delayed(self):
-        """See dask-cudf.to_delayed docstring for more information."""
+        """See dask_cudf.to_delayed docstring for more information."""
         return to_delayed(self)
 
     def append(self, other):
@@ -198,7 +198,7 @@ class _Frame(DaskMethodsMixin, OperatorMethodMixin):
 
 
 def _daskify(obj, npartitions=None, chunksize=None):
-    """Convert input to a dask-cudf object.
+    """Convert input to a dask_cudf object.
     """
     npartitions = npartitions or 1
     if isinstance(obj, _Frame):
@@ -249,7 +249,7 @@ def stack_partitions(dfs, divisions):
 
 
 def concat(objs, interleave_partitions=False):
-    """Concantenate dask-cudf objects
+    """Concantenate dask_cudf objects
 
     Parameters
     ----------
@@ -656,7 +656,7 @@ class DataFrame(_Frame):
             tmpdf = self.sort_values(index)
             return tmpdf._set_column_as_sorted_index(index, drop=drop)
         elif isinstance(index, Series):
-            indexname = '__dask-cudf.index'
+            indexname = '__dask_cudf.index'
             df = self.assign(**{indexname: index})
             return df.set_index(indexname, drop=drop, sorted=sorted)
         else:
@@ -1017,7 +1017,7 @@ def splits_divisions_sorted_cudf(df, chunksize):
 
 
 def from_cudf(data, npartitions=None, chunksize=None, sort=True, name=None):
-    """Create a dask-cudf from a cudf object
+    """Create a dask_cudf from a cudf object
 
     Parameters
     ----------
@@ -1036,8 +1036,8 @@ def from_cudf(data, npartitions=None, chunksize=None, sort=True, name=None):
 
     Returns
     -------
-    dask-cudf.DataFrame or dask-cudf.Series
-        A dask-cudf DataFrame/Series partitioned along the index
+    dask_cudf.DataFrame or dask_cudf.Series
+        A dask_cudf DataFrame/Series partitioned along the index
     """
     if not isinstance(data, (gd.Series, gd.DataFrame)):
         raise TypeError("Input must be a cudf DataFrame or Series")
@@ -1071,7 +1071,7 @@ def _from_pandas(df):
 
 
 def from_delayed(dfs, meta=None, prefix='from_delayed'):
-    """ Create dask-cudf DataFrame from many Dask Delayed objects
+    """ Create dask_cudf DataFrame from many Dask Delayed objects
     Parameters
     ----------
     dfs : list of Delayed
@@ -1116,7 +1116,7 @@ def from_delayed(dfs, meta=None, prefix='from_delayed'):
 
 
 def to_delayed(df):
-    """ Create Dask Delayed objects from a dask-cudf Dataframe
+    """ Create Dask Delayed objects from a dask_cudf Dataframe
     Returns a list of delayed values, one value per partition.
     """
     from dask.delayed import Delayed
@@ -1127,7 +1127,7 @@ def to_delayed(df):
 
 
 def from_dask_dataframe(df):
-    """Create a `dask-cudf.DataFrame` from a `dask.dataframe.DataFrame`
+    """Create a `dask_cudf.DataFrame` from a `dask.dataframe.DataFrame`
 
     Parameters
     ----------
@@ -1158,7 +1158,7 @@ def new_dd_object(dsk, name, meta, divisions):
 
 def _extract_meta(x):
     """
-    Extract internal cache data (``_meta``) from dask-cudf objects
+    Extract internal cache data (``_meta``) from dask_cudf objects
     """
     if isinstance(x, (Scalar, _Frame)):
         return x._meta
@@ -1181,7 +1181,7 @@ def _emulate(func, *args, **kwargs):
 
 
 def align_partitions(args):
-    """Align partitions between dask-cudf objects.
+    """Align partitions between dask_cudf objects.
 
     Note that if all divisions are unknown, but have equal npartitions, then
     they will be passed through unchanged."""
@@ -1204,7 +1204,7 @@ def map_partitions(func, *args, **kwargs):
         Function applied to each partition.
     args, kwargs :
         Arguments and keywords to pass to the function. At least one of the
-        args should be a dask-cudf object.
+        args should be a dask_cudf object.
     """
     meta = kwargs.pop('meta', None)
     if meta is not None:

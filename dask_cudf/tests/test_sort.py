@@ -3,19 +3,19 @@ import pytest
 import numpy as np
 import pandas as pd
 
-import pygdf
+import cudf as gd
 import dask
-import dask_gdf as dgd
+import dask_cudf as dgd
 
 
 @pytest.mark.parametrize('by', ['a', 'b'])
 @pytest.mark.parametrize('nelem', [10, 100, 1000])
 @pytest.mark.parametrize('nparts', [1, 2, 5, 10])
 def test_sort_values(nelem, nparts, by):
-    df = pygdf.DataFrame()
+    df = gd.DataFrame()
     df['a'] = np.ascontiguousarray(np.arange(nelem)[::-1])
     df['b'] = np.arange(100, nelem + 100)
-    ddf = dgd.from_pygdf(df, npartitions=nparts)
+    ddf = dgd.from_cudf(df, npartitions=nparts)
 
     got = ddf.sort_values(by=by).compute().to_pandas()
     expect = df.sort_values(by=by).to_pandas().reset_index(drop=True)
@@ -27,9 +27,9 @@ def test_sort_values_binned():
     nelem = 100
     nparts = 5
     by = 'a'
-    df = pygdf.DataFrame()
+    df = gd.DataFrame()
     df['a'] = np.random.randint(1, 5, nelem)
-    ddf = dgd.from_pygdf(df, npartitions=nparts)
+    ddf = dgd.from_cudf(df, npartitions=nparts)
 
     parts = ddf.sort_values_binned(by=by).to_delayed()
     part_uniques = []

@@ -4,14 +4,14 @@ import numpy as np
 import pandas as pd
 import pytest
 
-import pygdf as gd
-import dask_gdf as dgd
+import cudf as gd
+import dask_cudf as dgd
 
 
 def _make_empty_frame(npartitions=2):
     df = pd.DataFrame({'x': [], 'y': []})
     gdf = gd.DataFrame.from_pandas(df)
-    dgf = dgd.from_pygdf(gdf, npartitions=npartitions)
+    dgf = dgd.from_cudf(gdf, npartitions=npartitions)
     return dgf
 
 
@@ -19,7 +19,7 @@ def _make_random_frame(nelem, npartitions=2):
     df = pd.DataFrame({'x': np.random.random(size=nelem),
                        'y': np.random.random(size=nelem)})
     gdf = gd.DataFrame.from_pandas(df)
-    dgf = dgd.from_pygdf(gdf, npartitions=npartitions)
+    dgf = dgd.from_cudf(gdf, npartitions=npartitions)
     return df, dgf
 
 
@@ -27,7 +27,7 @@ def _make_random_frame_float(nelem, npartitions=2):
     df = pd.DataFrame({'x': np.random.randint(0, 5, size=nelem),
                        'y': np.random.normal(size=nelem) + 1})
     gdf = gd.DataFrame.from_pandas(df)
-    dgf = dgd.from_pygdf(gdf, npartitions=npartitions)
+    dgf = dgd.from_cudf(gdf, npartitions=npartitions)
     return df, dgf
 
 

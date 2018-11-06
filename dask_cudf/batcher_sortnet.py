@@ -91,9 +91,9 @@ def _compare_and_swap_frame(parts, a, b, max_part_size, by):
 
 
 def _cleanup(df):
-    if '__dask-cudf__valid' in df.columns:
-        out = df.query('__dask-cudf__valid')
-        del out['__dask-cudf__valid']
+    if '__dask_cudf__valid' in df.columns:
+        out = df.query('__dask_cudf__valid')
+        del out['__dask_cudf__valid']
     else:
         out = df
     return out

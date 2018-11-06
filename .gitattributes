@@ -1,1 +1,1 @@
-dask-cudf/_version.py export-subst
+dask_cudf/_version.py export-subst

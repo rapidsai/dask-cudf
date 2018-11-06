@@ -2,8 +2,8 @@ import pytest
 import numpy as np
 
 import pandas as pd
-import pygdf as gd
-import dask_gdf as dgd
+import cudf as gd
+import dask_cudf as dgd
 from functools import partial
 
 param_nrows = [5, 10, 50, 100]
@@ -19,7 +19,7 @@ def test_join_inner(left_nrows, right_nrows, left_nkeys, right_nkeys):
 
     np.random.seed(0)
 
-    # PyGDF
+    # cuDF
     left = gd.DataFrame({'x': np.random.randint(0, left_nkeys,
                                                 size=left_nrows),
                          'a': np.arange(left_nrows)}.items())
@@ -31,9 +31,9 @@ def test_join_inner(left_nrows, right_nrows, left_nkeys, right_nkeys):
                                       sort=True, lsuffix='l', rsuffix='r')
     expect = expect.to_pandas()
 
-    # Dask GDf
-    left = dgd.from_pygdf(left, chunksize=chunksize)
-    right = dgd.from_pygdf(right, chunksize=chunksize)
+    # dask_cudf
+    left = dgd.from_cudf(left, chunksize=chunksize)
+    right = dgd.from_cudf(right, chunksize=chunksize)
 
     joined = left.set_index('x').join(right.set_index('x'), how='inner',
                                       lsuffix='l', rsuffix='r')
@@ -70,7 +70,7 @@ def test_join_left(left_nrows, right_nrows, left_nkeys, right_nkeys, how):
 
     np.random.seed(0)
 
-    # PyGDF
+    # cuDF
     left = gd.DataFrame({'x': np.random.randint(0, left_nkeys,
                                                 size=left_nrows),
                          'a': np.arange(left_nrows, dtype=np.float64)}.items())
@@ -83,9 +83,9 @@ def test_join_left(left_nrows, right_nrows, left_nkeys, right_nkeys, how):
                                       sort=True, lsuffix='l', rsuffix='r')
     expect = expect.to_pandas()
 
-    # Dask GDf
-    left = dgd.from_pygdf(left, chunksize=chunksize)
-    right = dgd.from_pygdf(right, chunksize=chunksize)
+    # dask_cudf
+    left = dgd.from_cudf(left, chunksize=chunksize)
+    right = dgd.from_cudf(right, chunksize=chunksize)
 
     joined = left.set_index('x').join(right.set_index('x'), how=how,
                                       lsuffix='l', rsuffix='r')
@@ -129,7 +129,7 @@ def test_merge_left(left_nrows, right_nrows, left_nkeys, right_nkeys,
 
     np.random.seed(0)
 
-    # PyGDF
+    # cuDF
     left = gd.DataFrame({'x': np.random.randint(0, left_nkeys,
                                                 size=left_nrows),
                          'y': np.random.randint(0, left_nkeys,
@@ -152,9 +152,9 @@ def test_merge_left(left_nrows, right_nrows, left_nkeys, right_nkeys,
     print("Expect".center(80, '='))
     print(expect)
 
-    # Dask GDf
-    left = dgd.from_pygdf(left, chunksize=chunksize)
-    right = dgd.from_pygdf(right, chunksize=chunksize)
+    # dask_cudf
+    left = dgd.from_cudf(left, chunksize=chunksize)
+    right = dgd.from_cudf(right, chunksize=chunksize)
 
     joined = left.merge(right, on=('x', 'y'), how=how)
 
@@ -178,7 +178,7 @@ def test_merge_1col_left(left_nrows, right_nrows, left_nkeys, right_nkeys,
 
     np.random.seed(0)
 
-    # PyGDF
+    # cuDF
     left = gd.DataFrame({'x': np.random.randint(0, left_nkeys,
                                                 size=left_nrows),
                          'a': np.arange(left_nrows, dtype=np.float64)}.items())
@@ -197,9 +197,9 @@ def test_merge_1col_left(left_nrows, right_nrows, left_nkeys, right_nkeys,
     print("Expect".center(80, '='))
     print(expect)
 
-    # Dask GDf
-    left = dgd.from_pygdf(left, chunksize=chunksize)
-    right = dgd.from_pygdf(right, chunksize=chunksize)
+    # dask_cudf
+    left = dgd.from_cudf(left, chunksize=chunksize)
+    right = dgd.from_cudf(right, chunksize=chunksize)
 
     joined = left.merge(right, on=['x'], how=how)
 

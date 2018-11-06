@@ -4,7 +4,7 @@ import pytest
 from numba import cuda
 
 import cudf as gd
-import dask_gdf as dgd
+import dask_cudf as dgd
 
 
 def _gen_skewed_keys(nelem):
@@ -125,7 +125,7 @@ def test_groupby_harder_agg(agg):
 
 
 @pytest.mark.skip(reason="Fix needed from \
-    https://github.com/gpuopenanalytics/dask_gdf/pull/26")
+    https://github.com/gpuopenanalytics/dask_cudf/pull/26")
 @pytest.mark.skip(reason="Groupby apply not implemented in libgdf")
 def test_groupby_apply_grouped():
     np.random.seed(0)
@@ -178,7 +178,7 @@ def test_groupby_apply_grouped():
 
 
 @pytest.mark.skip(reason="Fix needed from \
-    https://github.com/gpuopenanalytics/dask_gdf/pull/26")
+    https://github.com/gpuopenanalytics/dask_cudf/pull/26")
 @pytest.mark.skip(reason="Groupby apply not implemented in libgdf")
 def test_groupby_apply():
     np.random.seed(0)
@@ -223,7 +223,7 @@ def test_groupby_apply():
 
 
 @pytest.mark.skip(reason="Fix needed from \
-    https://github.com/gpuopenanalytics/dask_gdf/pull/26")
+    https://github.com/gpuopenanalytics/dask_cudf/pull/26")
 def test_repeated_groupby():
     np.random.seed(0)
 
