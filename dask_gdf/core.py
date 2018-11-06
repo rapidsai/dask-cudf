@@ -1,3 +1,5 @@
+# Copyright (c) 2018, NVIDIA CORPORATION.
+
 import operator
 from uuid import uuid4
 from math import ceil
@@ -211,7 +213,42 @@ def _daskify(obj, npartitions=None, chunksize=None):
         raise TypeError("type {} is not supported".format(type(obj)))
 
 
-def concat(objs):
+def concat_indexed_dataframes(dfs):
+    """ Concatenate indexed dataframes together along the index """
+    meta = gd.concat(_extract_meta(dfs))
+
+    dfs2, divisions, parts = align_partitions(*dfs)
+
+    name = 'concat-indexed-' + tokenize(*dfs)
+
+    parts2 = [[df for df in part] for part in parts]
+
+    dsk = dict(((name, i), (gd.concat, part))
+               for i, part in enumerate(parts2))
+    for df in dfs2:
+        dsk.update(df.dask)
+
+    return new_dd_object(dsk, name, meta, divisions)
+
+
+def stack_partitions(dfs, divisions):
+    """Concatenate partitions on axis=0 by doing a simple stack"""
+    meta = gd.concat(_extract_meta(dfs))
+
+    name = 'concat-{0}'.format(tokenize(*dfs))
+    dsk = {}
+    i = 0
+    for df in dfs:
+        dsk.update(df.dask)
+
+        for key in df.__dask_keys__():
+            dsk[(name, i)] = key
+            i += 1
+
+    return new_dd_object(dsk, name, meta, divisions)
+
+
+def concat(objs, interleave_partitions=False):
     """Concantenate dask gdf objects
 
     Parameters
@@ -220,24 +257,25 @@ def concat(objs):
     objs : sequence of DataFrame, Series, Index
         A sequence of objects to be concatenated.
     """
-    objs = [_daskify(x) for x in objs]
-    meta = gd.concat(_extract_meta(objs))
+    dfs = [_daskify(x) for x in objs]
 
-    name = "concat-" + uuid4().hex
-    dsk = {}
-    divisions = [0]
-    base = 0
-    lastdiv = 0
-    for obj in objs:
-        for k, i in obj.__dask_keys__():
-            dsk[name, base + i] = k, i
-        base += obj.npartitions
-        divisions.extend([d + lastdiv for d in obj.divisions[1:]])
-        lastdiv = obj.divisions[-1]
+    if len(dfs) == 1:
+        return dfs[0]
 
-    dasks = [o.dask for o in objs]
-    dsk = merge(dsk, *dasks)
-    return new_dd_object(dsk, name, meta, divisions)
+    if all(df.known_divisions for df in dfs):
+        if all(dfs[i].divisions[-1] < dfs[i + 1].divisions[0]
+                for i in range(len(dfs) - 1)):
+            divisions = []
+            for df in dfs[:-1]:
+                # remove last to concatenate with next
+                divisions += df.divisions[:-1]
+            divisions += dfs[-1].divisions
+            return stack_partitions(dfs, divisions)
+    elif interleave_partitions:
+        return concat_indexed_dataframes(dfs)
+    else:
+        divisions = [None] * (sum([df.npartitions for df in dfs]) + 1)
+        return stack_partitions(dfs, divisions)
 
 
 normalize_token.register(_Frame, lambda a: a._name)
