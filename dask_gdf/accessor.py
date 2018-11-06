@@ -1,3 +1,10 @@
+# Copyright (c) 2008-2012, AQR Capital Management, LLC, Lambda Foundry, Inc.
+# and PyData Development Team
+# All rights reserved.
+
+# Copyright (c) 2014-2018, Anaconda, Inc. and contributors
+# All rights reserved.
+
 """
 
 accessor.py contains classes for implementing
@@ -7,6 +14,11 @@ accessor properties.
 
 from toolz import partial
 import pygdf as gd
+from pygdf.series import DatetimeProperties
+from pygdf.categorical import CategoricalAccessor as GdfCategoricalAccessor
+
+# Adapted from
+# https://github.com/dask/dask/blob/master/dask/dataframe/accessor.py
 
 
 class Accessor(object):
@@ -83,11 +95,36 @@ class Accessor(object):
         else:
             raise AttributeError(key)
 
+# Adapted from
+# https://github.com/pandas-dev/pandas/blob/master/pandas/core/accessor.py
+
+
+class CachedAccessor(object):
+    """Custom property-like object (descriptor) for caching accessors.
+    Parameters
+    ----------
+    name : str
+        The namespace this will be accessed under, e.g. ``df.timestamp.dt``
+    accessor : cls
+        The class with the extension methods. The class' __init__ method
+        should expect a ``Series`` as the single argument ``data``
+    """
+
+    def __init__(self, name, accessor):
+        self._name = name
+        self._accessor = accessor
+
+    def __get__(self, obj, cls):
+        if obj is None:
+            # we're accessing the attribute of the class, i.e., Dataset.geo
+            return self._accessor
+        accessor_obj = self._accessor(obj)
+        return accessor_obj
+
 
 class DatetimeAccessor(Accessor):
     """ Accessor object for datetimelike properties of the Series values.
     """
-    from pygdf.series import DatetimeProperties
 
     _accessor = DatetimeProperties
     _accessor_name = 'dt'
@@ -96,3 +133,18 @@ class DatetimeAccessor(Accessor):
         if not isinstance(series._meta._column, gd.datetime.DatetimeColumn):
             raise AttributeError("Can only use .dt accessor with datetimelike "
                                  "values")
+
+
+class CategoricalAccessor(Accessor):
+    """ Accessor object for categorical properties of the Series values
+    of Categorical type.
+    """
+
+    _accessor = GdfCategoricalAccessor
+    _accessor_name = 'cat'
+
+    def _validate(self, series):
+        if not isinstance(series._meta._column,
+                          gd.categorical.CategoricalColumn):
+            raise AttributeError(
+                "Can only use .cat accessor with categorical values")

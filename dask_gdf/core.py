@@ -24,7 +24,7 @@ from dask import compute
 
 from .utils import make_meta, check_meta
 from . import batcher_sortnet, join_impl
-from .accessor import DatetimeAccessor
+from .accessor import DatetimeAccessor, CategoricalAccessor, CachedAccessor
 
 
 def optimize(dsk, keys, **kwargs):
@@ -935,10 +935,11 @@ class Series(_Frame):
                          meta=self._meta, token='unique-k',
                          split_every=split_every, k=k)
 
-    @property
-    def dt(self):
-        """Namespace for datetime methods"""
-        return DatetimeAccessor(self)
+    # ----------------------------------------------------------------------
+    # Accessor Methods
+    # ----------------------------------------------------------------------
+    dt = CachedAccessor("dt", DatetimeAccessor)
+    cat = CachedAccessor("cat", CategoricalAccessor)
 
 
 for op in [operator.abs, operator.add, operator.eq, operator.gt, operator.ge,
