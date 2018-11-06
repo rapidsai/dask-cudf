@@ -293,6 +293,18 @@ class DataFrame(_Frame):
             return self.map_partitions(slice_columns, key, meta=meta)
         raise NotImplementedError("Indexing with %r" % key)
 
+    def __setitem__(self, key, value):
+        if isinstance(key, (tuple, list)):
+            df = self.assign(**{k: value[c]
+                                for k, c in zip(key, value.columns)})
+        else:
+            df = self.assign(**{key: value})
+
+        self.dask = df.dask
+        self._name = df._name
+        self._meta = df._meta
+        self.divisions = df.divisions
+
     def drop_columns(self, *args):
         cols = list(self.columns)
         for k in args:
@@ -330,13 +342,9 @@ class DataFrame(_Frame):
         return op
 
     def _assign_column(self, k, v):
-        if not isinstance(v, Series):
-            msg = 'cannot column {!r} of type: {}'
-            raise TypeError(msg.format(k, type(v)))
-
         def assigner(df, k, v):
             out = df.copy()
-            out.add_column(k, v)
+            out[k] = v
             return out
 
         meta = assigner(self._meta, k, make_meta(v))
@@ -678,8 +686,10 @@ class DataFrame(_Frame):
         """
         parts = self.to_delayed()
         sorted_parts = batcher_sortnet.sort_delayed_frame(parts, by)
-        return from_delayed(sorted_parts, meta=self._meta).reset_index(
-            force=not ignore_index)
+        return from_delayed(
+            sorted_parts,
+            meta=self._meta
+        ).reset_index(force=not ignore_index)
 
     def sort_values_binned(self, by):
         """Sorty by the given column and ensure that the same key
