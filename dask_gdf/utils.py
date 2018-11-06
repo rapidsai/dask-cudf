@@ -40,7 +40,7 @@ def make_meta(x):
         if isinstance(meta2, pd.DataFrame):
             return gd.DataFrame.from_pandas(meta2)
         elif isinstance(meta2, pd.Series):
-            return gd.Series.from_any(meta2)
+            return gd.Series(meta2)
         else:
             if isinstance(meta2, pd.RangeIndex):
                 return gd.index.RangeIndex(meta2.start, meta2.stop)
