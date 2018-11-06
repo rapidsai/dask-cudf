@@ -10,6 +10,8 @@
 #
 set -e
 
+CUDA=9.2.148_396.37
+
 # Get CUDA release
 if [ ${CUDA:0:1} == '9' ]
 then

@@ -24,9 +24,10 @@ from dask.dataframe.core import Scalar
 from dask.delayed import delayed
 from dask import compute
 
-from .utils import make_meta, check_meta
-from . import batcher_sortnet, join_impl
-from .accessor import DatetimeAccessor, CategoricalAccessor, CachedAccessor
+from dask_cudf.utils import make_meta, check_meta
+from dask_cudf import batcher_sortnet, join_impl
+from dask_cudf.accessor import DatetimeAccessor, CategoricalAccessor,\
+    CachedAccessor
 
 
 def optimize(dsk, keys, **kwargs):

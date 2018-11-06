@@ -3,7 +3,7 @@ import numpy as np
 from dask.delayed import delayed
 import cudf as gd
 
-from .core import from_delayed
+from dask_cudf.core import from_delayed
 
 
 class Groupby(object):
