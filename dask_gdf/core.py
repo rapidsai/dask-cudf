@@ -23,7 +23,7 @@ from dask.delayed import delayed
 from dask import compute
 
 from .utils import make_meta, check_meta
-from . import batcher_sortnet
+from . import batcher_sortnet, join_impl
 from .accessor import DatetimeAccessor
 
 
@@ -384,6 +384,22 @@ class DataFrame(_Frame):
         from .groupby import Groupby
 
         return Groupby(df=self, by=by)
+
+    def merge(self, other, on=None, how='left', lsuffix='_x', rsuffix='_y'):
+        """Merging two dataframes on the column(s) indicated in *on*.
+        """
+        assert how == 'left', 'left join is impelemented'
+        if on is None:
+            return self.join(other, how=how, lsuffix=lsuffix, rsuffix=rsuffix)
+        else:
+            return join_impl.join_frames(
+                left=self,
+                right=other,
+                on=on,
+                how=how,
+                lsuffix=lsuffix,
+                rsuffix=rsuffix,
+                )
 
     def join(self, other, how='left', lsuffix='', rsuffix=''):
         """Join two datatframes
