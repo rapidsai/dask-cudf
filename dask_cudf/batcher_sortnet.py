@@ -5,7 +5,7 @@ Adapted from https://en.wikipedia.org/wiki/Batcher_odd%E2%80%93even_mergesort
 import math
 
 from dask import delayed, compute
-import pygdf
+import cudf as gd
 
 
 def get_oversized(length):
@@ -69,7 +69,7 @@ def _pad_data_to_length(parts):
 
 def _compare_frame(a, b, max_part_size, by):
     if a is not None and b is not None:
-        joint = pygdf.concat([a, b])
+        joint = gd.concat([a, b])
         sorten = joint.sort_values(by=by)
         # Split the sorted frame using the *max_part_size*
         lhs, rhs = sorten[:max_part_size], sorten[max_part_size:]
@@ -91,9 +91,9 @@ def _compare_and_swap_frame(parts, a, b, max_part_size, by):
 
 
 def _cleanup(df):
-    if '__dask_gdf__valid' in df.columns:
-        out = df.query('__dask_gdf__valid')
-        del out['__dask_gdf__valid']
+    if '__dask_cudf__valid' in df.columns:
+        out = df.query('__dask_cudf__valid')
+        del out['__dask_cudf__valid']
     else:
         out = df
     return out
@@ -104,7 +104,7 @@ def sort_delayed_frame(parts, by):
     Parameters
     ----------
     parts :
-        Delayed partitions of pygdf.DataFrame
+        Delayed partitions of cudf.DataFrame
     by : str
         Column name by which to sort
 

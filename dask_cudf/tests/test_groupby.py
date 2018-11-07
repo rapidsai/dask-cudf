@@ -3,8 +3,8 @@ import pandas as pd
 import pytest
 from numba import cuda
 
-import pygdf as gd
-import dask_gdf as dgd
+import cudf as gd
+import dask_cudf as dgd
 
 
 def _gen_skewed_keys(nelem):
@@ -41,7 +41,7 @@ def test_groupby_single_key(keygen):
     df = pd.DataFrame({'x': xs,
                        'z': np.random.normal(size=nelem) + 1})
     gdf = gd.DataFrame.from_pandas(df)
-    dgf = dgd.from_pygdf(gdf, npartitions=npartitions)
+    dgf = dgd.from_cudf(gdf, npartitions=npartitions)
 
     groups = dgf.groupby(by=['x']).count()
     got = groups.compute().to_pandas()
@@ -72,7 +72,7 @@ def test_groupby_multi_keys(keygen):
                        'z': np.random.normal(size=nelem) + 1})
 
     gdf = gd.DataFrame.from_pandas(df)
-    dgf = dgd.from_pygdf(gdf, npartitions=npartitions)
+    dgf = dgd.from_cudf(gdf, npartitions=npartitions)
 
     groups = dgf.groupby(by=['x', 'y']).count()
     got = groups.compute().to_pandas()
@@ -97,7 +97,7 @@ def check_groupby_agg(agg):
                        'v2': np.random.normal(size=nelem)})
 
     gdf = gd.DataFrame.from_pandas(df)
-    dgf = dgd.from_pygdf(gdf, npartitions=npartitions)
+    dgf = dgd.from_cudf(gdf, npartitions=npartitions)
 
     gotgroup = dgf.groupby(by='x')
     expgroup = df.groupby(by='x', as_index=False)
@@ -118,14 +118,14 @@ def test_groupby_agg(agg):
     check_groupby_agg(agg)
 
 
-@pytest.mark.skip(reason="Not implemented by pygdf yet")
+@pytest.mark.skip(reason="Not implemented by cudf yet")
 @pytest.mark.parametrize('agg', ['mean', 'std'])
 def test_groupby_harder_agg(agg):
     check_groupby_agg(agg)
 
 
 @pytest.mark.skip(reason="Fix needed from \
-    https://github.com/gpuopenanalytics/dask_gdf/pull/26")
+    https://github.com/gpuopenanalytics/dask_cudf/pull/26")
 @pytest.mark.skip(reason="Groupby apply not implemented in libgdf")
 def test_groupby_apply_grouped():
     np.random.seed(0)
@@ -140,7 +140,7 @@ def test_groupby_apply_grouped():
                        'v2': np.random.normal(size=nelem)})
 
     gdf = gd.DataFrame.from_pandas(df)
-    dgf = dgd.from_pygdf(gdf, npartitions=2)
+    dgf = dgd.from_cudf(gdf, npartitions=2)
 
     def transform(y, v1, v2, out1):
         for i in range(cuda.threadIdx.x, y.size, cuda.blockDim.x):
@@ -178,7 +178,7 @@ def test_groupby_apply_grouped():
 
 
 @pytest.mark.skip(reason="Fix needed from \
-    https://github.com/gpuopenanalytics/dask_gdf/pull/26")
+    https://github.com/gpuopenanalytics/dask_cudf/pull/26")
 @pytest.mark.skip(reason="Groupby apply not implemented in libgdf")
 def test_groupby_apply():
     np.random.seed(0)
@@ -193,7 +193,7 @@ def test_groupby_apply():
                        'v2': np.random.normal(size=nelem)})
 
     gdf = gd.DataFrame.from_pandas(df)
-    dgf = dgd.from_pygdf(gdf, npartitions=2)
+    dgf = dgd.from_cudf(gdf, npartitions=2)
 
     def transform(df):
         df['out1'] = df.y * (df.v1 + df.v2)
@@ -223,7 +223,7 @@ def test_groupby_apply():
 
 
 @pytest.mark.skip(reason="Fix needed from \
-    https://github.com/gpuopenanalytics/dask_gdf/pull/26")
+    https://github.com/gpuopenanalytics/dask_cudf/pull/26")
 def test_repeated_groupby():
     np.random.seed(0)
 
@@ -233,7 +233,7 @@ def test_repeated_groupby():
     df['b'] = _gen_uniform_keys(nelem)
 
     ref_df = gd.DataFrame.from_pandas(df)
-    df = dgd.from_pygdf(ref_df, npartitions=3)
+    df = dgd.from_cudf(ref_df, npartitions=3)
     assert df.known_divisions
 
     df2 = df.groupby('a').apply(lambda x: x)
@@ -260,7 +260,7 @@ def test_groupby_tree_reduce_max(nelem, npart):
     df['b'] = _gen_uniform_keys(nelem)
 
     ref_df = gd.DataFrame.from_pandas(df)
-    dgf = dgd.from_pygdf(ref_df, npartitions=npart)
+    dgf = dgd.from_cudf(ref_df, npartitions=npart)
     got = dgf.groupby('a').max().compute().to_pandas()
     expect = df.groupby('a', as_index=False).max()
 
@@ -282,7 +282,7 @@ def test_groupby_tree_reduce_multi_agg(nelem, npart):
     df['c'] = _gen_uniform_keys(nelem)
 
     ref_df = gd.DataFrame.from_pandas(df)
-    dgf = dgd.from_pygdf(ref_df, npartitions=npart)
+    dgf = dgd.from_cudf(ref_df, npartitions=npart)
     got = dgf.groupby('a').agg({'b': 'max', 'c': 'min'}).compute().to_pandas()
     expect = df.groupby('a', as_index=False).agg({'b': 'max', 'c': 'min'})
 

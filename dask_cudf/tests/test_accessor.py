@@ -1,8 +1,8 @@
 import pytest
 import numpy as np
 from pandas.util.testing import assert_series_equal
-from pygdf.dataframe import Series
-import dask_gdf as dgd
+from cudf.dataframe import Series
+import dask_cudf as dgd
 import pandas as pd
 
 #############################################################################
@@ -26,7 +26,7 @@ dt_fields = ['year', 'month', 'day', 'hour', 'minute', 'second']
 def test_datetime_accessor_initialization(data):
     pdsr = pd.Series(data.copy())
     sr = Series(pdsr)
-    dsr = dgd.from_pygdf(sr, npartitions=5)
+    dsr = dgd.from_cudf(sr, npartitions=5)
     dsr.dt
 
 
@@ -34,7 +34,7 @@ def test_datetime_accessor_initialization(data):
 def test_series(data):
     pdsr = pd.Series(data.copy())
     sr = Series(pdsr)
-    dsr = dgd.from_pygdf(sr, npartitions=5)
+    dsr = dgd.from_cudf(sr, npartitions=5)
 
     np.testing.assert_equal(
         np.array(pdsr),
@@ -47,7 +47,7 @@ def test_series(data):
 def test_dt_series(data, field):
     pdsr = pd.Series(data.copy())
     sr = Series(pdsr)
-    dsr = dgd.from_pygdf(sr, npartitions=5)
+    dsr = dgd.from_cudf(sr, npartitions=5)
     base = getattr(pdsr.dt, field)
     test = getattr(dsr.dt, field).compute()\
                                  .to_pandas().astype('int64')
@@ -80,7 +80,7 @@ def data_cat_3():
 @pytest.mark.xfail(raises=AttributeError)
 def test_categorical_accessor_initialization(data):
     sr = Series(data.copy())
-    dsr = dgd.from_pygdf(sr, npartitions=5)
+    dsr = dgd.from_cudf(sr, npartitions=5)
     dsr.cat
 
 
@@ -89,7 +89,7 @@ def test_categorical_basic(data):
     cat = data.copy()
     pdsr = pd.Series(cat)
     sr = Series(cat)
-    dsr = dgd.from_pygdf(sr, npartitions=2)
+    dsr = dgd.from_cudf(sr, npartitions=2)
     result = dsr.compute()
     np.testing.assert_array_equal(cat.codes, result.to_array())
     assert dsr.dtype == pdsr.dtype
@@ -120,7 +120,7 @@ def test_categorical_compare_unordered(data):
     cat = data.copy()
     pdsr = pd.Series(cat)
     sr = Series(cat)
-    dsr = dgd.from_pygdf(sr, npartitions=2)
+    dsr = dgd.from_cudf(sr, npartitions=2)
 
     # Test equality
     out = dsr == dsr
@@ -155,8 +155,8 @@ def test_categorical_compare_ordered(data):
     pdsr2 = pd.Series(cat2)
     sr1 = Series(cat1)
     sr2 = Series(cat2)
-    dsr1 = dgd.from_pygdf(sr1, npartitions=2)
-    dsr2 = dgd.from_pygdf(sr2, npartitions=2)
+    dsr1 = dgd.from_cudf(sr1, npartitions=2)
+    dsr2 = dgd.from_cudf(sr2, npartitions=2)
 
     # Test equality
     out = dsr1 == dsr1

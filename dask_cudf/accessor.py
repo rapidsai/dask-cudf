@@ -13,9 +13,9 @@ accessor properties.
 """
 
 from toolz import partial
-import pygdf as gd
-from pygdf.series import DatetimeProperties
-from pygdf.categorical import CategoricalAccessor as GdfCategoricalAccessor
+import cudf as gd
+from cudf.series import DatetimeProperties
+from cudf.categorical import CategoricalAccessor as GdfCategoricalAccessor
 
 # Adapted from
 # https://github.com/dask/dask/blob/master/dask/dataframe/accessor.py
