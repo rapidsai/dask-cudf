@@ -8,21 +8,21 @@ Setup from source repo:
 
 1.  Install dependencies into a new conda environment
 
-        conda install -n dask-gdf \
-           -c numba -c conda-forge -c gpuopenanalytics/label/dev -c defaults \
+        conda install -n dask-cudf \
+           -c rapidsai -c numba -c conda-forge -c defaults \
            pygdf dask distributed cudatoolkit
 
 2.  Activate conda environment:
 
-        source activate dask-gdf
+        source activate dask-cudf
 
 3.  Clone dask_gdf repo:
 
-        git clone https://github.com/gpuopenanalytics/dask_gdf
+        git clone https://github.com/rapidsai/dask-cudf
 
 4.  Install from source:
 
-        cd dask_gdf
+        cd dask-cudf
         pip install .
 
 ## Test
@@ -33,8 +33,8 @@ Setup from source repo:
 
 2.  Run all tests:
 
-        py.test dask_gdf
+        py.test dask_cudf
 
 3. Or, run individual tests:
 
-        pytest dask_gdf/tests/test_file.py
+        pytest dask_cudf/tests/test_file.py
