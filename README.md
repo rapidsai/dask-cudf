@@ -9,7 +9,7 @@ Setup from source repo:
 1.  Install dependencies into a new conda environment
 
         conda install -n dask-cudf \
-           -c numba -c conda-forge -c rapidsai -c defaults \
+           -c rapidsai -c numba -c conda-forge -c defaults \
            pygdf dask distributed cudatoolkit
 
 2.  Activate conda environment:
