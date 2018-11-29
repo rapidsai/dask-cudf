@@ -14,8 +14,8 @@ accessor properties.
 
 from toolz import partial
 import cudf as gd
-from cudf.series import DatetimeProperties
-from cudf.categorical import CategoricalAccessor as GdfCategoricalAccessor
+from cudf.dataframe.series import DatetimeProperties
+from cudf.dataframe.categorical import CategoricalAccessor as GdfCategoricalAccessor
 
 # Adapted from
 # https://github.com/dask/dask/blob/master/dask/dataframe/accessor.py

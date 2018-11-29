@@ -988,7 +988,7 @@ for op in [operator.abs, operator.add, operator.eq, operator.gt, operator.ge,
 
 
 class Index(Series):
-    _partition_type = gd.index.Index
+    _partition_type = gd.dataframe.index.Index
 
     @property
     def index(self):
