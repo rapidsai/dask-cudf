@@ -141,7 +141,7 @@ def test_frame_extra_columns_error():
         combined.compute()
 
     raises.match(r"^Metadata mismatch found in `from_delayed`.")
-    raises.match(r"extra columns")
+    raises.match(r"z")
 
 
 def test_frame_dtype_error():
@@ -163,6 +163,4 @@ def test_frame_dtype_error():
     with pytest.raises(ValueError) as raises:
         combined.compute()
 
-    print("out")
-    raises.match(r"^Metadata mismatch found in `from_delayed`.")
-    raises.match(r"\s+\|\s+".join(['bad', 'float32', 'float64']))
+    raises.match(r"same type")

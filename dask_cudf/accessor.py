@@ -13,7 +13,7 @@ accessor properties.
 """
 
 from toolz import partial
-import cudf as gd
+import cudf
 from cudf.dataframe.series import DatetimeProperties
 from cudf.dataframe.categorical import CategoricalAccessor as GdfCategoricalAccessor
 
@@ -130,7 +130,7 @@ class DatetimeAccessor(Accessor):
     _accessor_name = 'dt'
 
     def _validate(self, series):
-        if not isinstance(series._meta._column, gd.datetime.DatetimeColumn):
+        if not isinstance(series._meta._column, cudf.dataframe.DatetimeColumn):
             raise AttributeError("Can only use .dt accessor with datetimelike "
                                  "values")
 
@@ -142,9 +142,10 @@ class CategoricalAccessor(Accessor):
 
     _accessor = GdfCategoricalAccessor
     _accessor_name = 'cat'
+    ordered = True
 
     def _validate(self, series):
         if not isinstance(series._meta._column,
-                          gd.categorical.CategoricalColumn):
+                          cudf.dataframe.categorical.CategoricalColumn):
             raise AttributeError(
                 "Can only use .cat accessor with categorical values")

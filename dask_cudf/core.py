@@ -7,11 +7,12 @@ from collections import OrderedDict
 
 import numpy as np
 import pandas as pd
-import cudf as gd
+import cudf
 from libgdf_cffi import libgdf
 from toolz import merge, partition_all
 
 import dask.dataframe as dd
+import dask
 from dask.base import tokenize, normalize_token, DaskMethodsMixin
 from dask.context import _globals
 from dask.core import flatten
@@ -21,6 +22,7 @@ from dask.threaded import get as threaded_get
 from dask.utils import funcname, M, OperatorMethodMixin
 from dask.dataframe.utils import raise_on_meta_error
 from dask.dataframe.core import Scalar
+from dask.dataframe import from_delayed
 from dask.delayed import delayed
 from dask import compute
 
@@ -40,10 +42,10 @@ def optimize(dsk, keys, **kwargs):
 
 
 def finalize(results):
-    return gd.concat(results)
+    return cudf.concat(results)
 
 
-class _Frame(DaskMethodsMixin, OperatorMethodMixin):
+class _Frame(dd.core._Frame, OperatorMethodMixin):
     """ Superclass for DataFrame and Series
 
     Parameters
@@ -59,7 +61,7 @@ class _Frame(DaskMethodsMixin, OperatorMethodMixin):
     divisions : tuple of index values
         Values along which we partition our blocks on the index
     """
-    __dask_scheduler__ = staticmethod(threaded_get)
+    __dask_scheduler__ = staticmethod(dask.get)
     __dask_optimize__ = staticmethod(optimize)
 
     def __dask_postcompute__(self):
@@ -79,12 +81,6 @@ class _Frame(DaskMethodsMixin, OperatorMethodMixin):
         self._meta = meta
         self.divisions = tuple(divisions)
 
-    def __dask_keys__(self):
-        return [(self._name, i) for i in range(self.npartitions)]
-
-    def __dask_graph__(self):
-        return self.dask
-
     def __getstate__(self):
         return (self.dask, self._name, self._meta, self.divisions)
 
@@ -95,106 +91,12 @@ class _Frame(DaskMethodsMixin, OperatorMethodMixin):
         s = "<dask_cudf.%s | %d tasks | %d npartitions>"
         return s % (type(self).__name__, len(self.dask), self.npartitions)
 
-    @property
-    def known_divisions(self):
-        """Is divisions known?
-        """
-        return len(self.divisions) > 0 and self.divisions[0] is not None
-
-    @property
-    def npartitions(self):
-        """Return number of partitions"""
-        return len(self.divisions) - 1
-
-    @property
-    def index(self):
-        """Return dask Index instance"""
-        name = self._name + '-index'
-        dsk = {(name, i): (getattr, key, 'index')
-               for i, key in enumerate(self.__dask_keys__())}
-        return Index(merge(dsk, self.dask), name,
-                     self._meta.index, self.divisions)
-
-    @classmethod
-    def _get_unary_operator(cls, op):
-        return lambda self: map_partitions(op, self)
-
-    @classmethod
-    def _get_binary_operator(cls, op, inv=False):
-        if inv:
-            return lambda self, other: map_partitions(op, other, self)
-        else:
-            return lambda self, other: map_partitions(op, self, other)
-
-    def __len__(self):
-        return reduction(self, len, np.sum, meta=int,
-                         split_every=False).compute()
-
-    def map_partitions(self, func, *args, **kwargs):
-        """ Apply Python function on each DataFrame partition.
-
-        Note that the index and divisions are assumed to remain unchanged.
-
-        Parameters
-        ----------
-        func : function
-            Function applied to each partition.
-        args, kwargs :
-            Arguments and keywords to pass to the function. The partition will
-            be the first argument, and these will be passed *after*.
-        """
-        return map_partitions(func, self, *args, **kwargs)
-
-    def head(self, n=5, npartitions=1, compute=True):
-        """ First n rows of the dataset
-
-        Parameters
-        ----------
-        n : int, optional
-            The number of rows to return. Default is 5.
-        npartitions : int, optional
-            Elements are only taken from the first ``npartitions``, with a
-            default of 1. If there are fewer than ``n`` rows in the first
-            ``npartitions`` a warning will be raised and any found rows
-            returned. Pass -1 to use all partitions.
-        compute : bool, optional
-            Whether to compute the result, default is True.
-        """
-        if npartitions <= -1:
-            npartitions = self.npartitions
-        if npartitions > self.npartitions:
-            raise ValueError("only %d partitions, received "
-                             "%d" % (self.npartitions, npartitions))
-
-        name = 'head-%d-%d-%s' % (npartitions, n, self._name)
-
-        if npartitions > 1:
-            name_p = 'head-partial-%d-%s' % (n, self._name)
-            dsk = {(name_p, i): (M.head, (self._name, i), n)
-                   for i in range(npartitions)}
-            dsk[(name, 0)] = (M.head, (gd.concat, sorted(dsk)), n)
-        else:
-            dsk = {(name, 0): (M.head, (self._name, 0), n)}
-
-        res = new_dd_object(merge(self.dask, dsk), name, self._meta,
-                            (self.divisions[0], self.divisions[npartitions]))
-
-        return res.compute() if compute else res
-
     def to_dask_dataframe(self):
         """Create a dask.dataframe object from a dask_cudf object"""
-        meta = self._meta.to_pandas()
-        dummy = self.map_partitions(M.to_pandas, meta=self._meta)
-        return dd.core.new_dd_object(dummy.dask, dummy._name, meta,
-                                     dummy.divisions)
-
-    def to_delayed(self):
-        """See dask_cudf.to_delayed docstring for more information."""
-        return to_delayed(self)
+        return self.map_partitions(M.to_pandas)
 
     def append(self, other):
-        """Add rows from *other*
-        """
+        """ Add rows from *other* """
         return concat([self, other])
 
 
@@ -206,7 +108,7 @@ def _daskify(obj, npartitions=None, chunksize=None):
         return obj
     elif isinstance(obj, (pd.DataFrame, pd.Series, pd.Index)):
         return _daskify(dd.from_pandas(obj, npartitions=npartitions))
-    elif isinstance(obj, (gd.DataFrame, gd.Series, gd.index.Index)):
+    elif isinstance(obj, (cudf.DataFrame, cudf.Series, cudf.Index)):
         return from_cudf(obj, npartitions=npartitions)
     elif isinstance(obj, (dd.DataFrame, dd.Series, dd.Index)):
         return from_dask_dataframe(obj)
@@ -216,7 +118,7 @@ def _daskify(obj, npartitions=None, chunksize=None):
 
 def concat_indexed_dataframes(dfs):
     """ Concatenate indexed dataframes together along the index """
-    meta = gd.concat(_extract_meta(dfs))
+    meta = cudf.concat(_extract_meta(dfs))
 
     dfs2, divisions, parts = align_partitions(*dfs)
 
@@ -224,17 +126,17 @@ def concat_indexed_dataframes(dfs):
 
     parts2 = [[df for df in part] for part in parts]
 
-    dsk = dict(((name, i), (gd.concat, part))
+    dsk = dict(((name, i), (cudf.concat, part))
                for i, part in enumerate(parts2))
     for df in dfs2:
         dsk.update(df.dask)
 
-    return new_dd_object(dsk, name, meta, divisions)
+    return dd.core.new_dd_object(dsk, name, meta, divisions)
 
 
 def stack_partitions(dfs, divisions):
     """Concatenate partitions on axis=0 by doing a simple stack"""
-    meta = gd.concat(_extract_meta(dfs))
+    meta = cudf.concat(_extract_meta(dfs))
 
     name = 'concat-{0}'.format(tokenize(*dfs))
     dsk = {}
@@ -246,7 +148,7 @@ def stack_partitions(dfs, divisions):
             dsk[(name, i)] = key
             i += 1
 
-    return new_dd_object(dsk, name, meta, divisions)
+    return dd.core.new_dd_object(dsk, name, meta, divisions)
 
 
 def concat(objs, interleave_partitions=False):
@@ -283,102 +185,18 @@ normalize_token.register(_Frame, lambda a: a._name)
 
 
 def query(df, expr, callenv):
-    boolmask = gd.queryutils.query_execute(df, expr, callenv)
+    boolmask = cudf.utils.queryutils.query_execute(df, expr, callenv)
 
-    selected = gd.Series(boolmask)
-    newdf = gd.DataFrame()
+    selected = cudf.Series(boolmask)
+    newdf = cudf.DataFrame()
     for col in df.columns:
         newseries = df[col][selected]
         newdf[col] = newseries
     return newdf
 
 
-class DataFrame(_Frame):
-    _partition_type = gd.DataFrame
-
-    @property
-    def columns(self):
-        return self._meta.columns
-
-    @property
-    def dtypes(self):
-        return self._meta.dtypes
-
-    def __dir__(self):
-        o = set(dir(type(self)))
-        o.update(self.__dict__)
-        o.update(c for c in self.columns if
-                 (isinstance(c, pd.compat.string_types) and
-                  pd.compat.isidentifier(c)))
-        return list(o)
-
-    def __getattr__(self, key):
-        if key in self.columns:
-            return self[key]
-        raise AttributeError("'DataFrame' object has no attribute %r" % key)
-
-    def __getitem__(self, key):
-        if isinstance(key, str) and key in self.columns:
-            meta = self._meta[key]
-            name = 'getitem-%s' % tokenize(self, key)
-            dsk = {(name, i): (operator.getitem, (self._name, i), key)
-                   for i in range(self.npartitions)}
-            return Series(merge(self.dask, dsk), name, meta, self.divisions)
-        elif isinstance(key, list):
-            def slice_columns(df, key):
-                return df.loc[:, key]
-
-            meta = slice_columns(self._meta, key)
-            return self.map_partitions(slice_columns, key, meta=meta)
-        raise NotImplementedError("Indexing with %r" % key)
-
-    def __setitem__(self, key, value):
-        if isinstance(key, (tuple, list)):
-            df = self.assign(**{k: value[c]
-                                for k, c in zip(key, value.columns)})
-        else:
-            df = self.assign(**{key: value})
-
-        self.dask = df.dask
-        self._name = df._name
-        self._meta = df._meta
-        self.divisions = df.divisions
-
-    def drop_columns(self, *args):
-        cols = list(self.columns)
-        for k in args:
-            del cols[cols.index(k)]
-        return self[cols]
-
-    def rename(self, columns):
-        op = self
-        for k, v in columns.items():
-            op = op._rename_column(k, v)
-        return op
-
-    def _rename_column(self, k, v):
-        def replace(df, k, v):
-            sr = df[k]
-            del df[k]
-            df[v] = sr
-            return df
-
-        meta = replace(self._meta, k, v)
-        return self.map_partitions(replace, k, v, meta=meta)
-
-    def assign(self, **kwargs):
-        """Add columns to the dataframe.
-
-        Parameters
-        ----------
-        **kwargs : dict
-            The keys are used for the column names.
-            The values are Series for the new column.
-        """
-        op = self
-        for k, v in kwargs.items():
-            op = op._assign_column(k, v)
-        return op
+class DataFrame(_Frame, dd.core.DataFrame):
+    _partition_type = cudf.DataFrame
 
     def _assign_column(self, k, v):
         def assigner(df, k, v):
@@ -503,16 +321,16 @@ class DataFrame(_Frame):
 
         @delayed
         def fix_column(lhs):
-            df = gd.DataFrame()
+            df = cudf.DataFrame()
             for k in lhs.columns:
                 df[k + lsuffix] = lhs[k]
 
             for k, dtype in rhs_dtypes:
                 data = np.zeros(len(lhs), dtype=dtype)
-                mask_size = gd.utils.calc_chunk_size(data.size,
-                                                     gd.utils.mask_bitsize)
-                mask = np.zeros(mask_size, dtype=gd.utils.mask_dtype)
-                sr = gd.Series.from_masked_array(data=data,
+                mask_size = cudf.utils.calc_chunk_size(data.size,
+                                                     cudf.utils.mask_bitsize)
+                mask = np.zeros(mask_size, dtype=cudf.utils.mask_dtype)
+                sr = cudf.Series.from_masked_array(data=data,
                                                  mask=mask,
                                                  null_count=data.size)
 
@@ -607,7 +425,7 @@ class DataFrame(_Frame):
                 s = max(first, firstindex)
                 e = min(last, lastindex)
                 others.append(d.loc[s:e])
-            return gd.concat(others)
+            return cudf.concat(others)
 
         newparts = []
         for idx, depends in remap.items():
@@ -704,8 +522,8 @@ class DataFrame(_Frame):
             @delayed
             def fix_index(df, startpos):
                 stoppos = startpos + len(df)
-                return df.set_index(gd.index.RangeIndex(start=startpos,
-                                                        stop=stoppos))
+                return df.set_index(cudf.dataframe.RangeIndex(start=startpos,
+                                                              stop=stoppos))
 
             outdfs = [fix_index(df, startpos)
                       for df, startpos in zip(dfs, prefixes)]
@@ -760,7 +578,7 @@ class DataFrame(_Frame):
         def join(df, other, keys):
             others = [other.query('{by}==@k'.format(by=by))
                       for k in sorted(keys)]
-            return gd.concat([df] + others)
+            return cudf.concat([df] + others)
 
         @delayed
         def drop(df, keep_keys):
@@ -792,93 +610,11 @@ class DataFrame(_Frame):
         shufidx = self._argsort(by)
         return self.take(shufidx)
 
-    def take(self, indices, npartitions=None, chunksize=None):
-        """Take elements from the positional indices.
-
-        Parameters
-        ----------
-        indices : Series
-
-        Note
-        ----
-        Difference from pandas:
-            * We reset the index to 0..N to maintain the property that
-              the indices must be sorted.
-
-        """
-        indices = _daskify(indices, npartitions=npartitions,
-                           chunksize=chunksize)
-
-        def get_parts(idxs, divs):
-            parts = [p for i in idxs
-                     for p, (s, e) in enumerate(zip(divs, divs[1:]))
-                     if s <= i and (i < e or e == divs[-1])]
-            return parts
-
-        @delayed
-        def partition(sr, divs):
-            return sorted(frozenset(get_parts(sr.to_array(), divs)))
-
-        @delayed
-        def first_index(df):
-            return df.index[0]
-
-        @delayed
-        def last_index(df):
-            return df.index[-1]
-
-        parts = self.to_delayed()
-        # get parts
-        if self.known_divisions:
-            divs = self.divisions
-        else:
-            divs = [first_index(p) for p in parts] + [last_index(parts[-1])]
-
-        sridx = indices.to_delayed()
-        # drop empty partitions in sridx
-        sridx_sizes = compute(*map(delayed(len), sridx))
-        sridx = [sr for sr, n in zip(sridx, sridx_sizes) if n > 0]
-        # compute partitioning
-        partsel = compute(*(partition(sr, divs) for sr in sridx))
-
-        grouped_parts = [tuple(parts[j] for j in sel)
-                         for sel in partsel]
-
-        # compute sizes of each partition
-        sizes = compute(*map(delayed(len), parts))
-        prefixes = np.zeros_like(sizes)
-        prefixes[1:] = np.cumsum(sizes)[:-1]
-
-        # shuffle them
-        @delayed
-        def shuffle(sr, prefixes, divs, *deps):
-            idxs = sr.to_array()
-            parts = np.asarray(get_parts(idxs, divs))
-
-            partdfs = []
-            for p, df in zip(sorted(frozenset(parts)), deps):
-                cond = parts == p
-                valididxs = idxs[cond]
-                ordering = np.arange(len(idxs))[cond]
-                selected = valididxs - prefixes[p]
-                sel = df.take(selected).set_index(ordering)
-                partdfs.append(sel)
-
-            joined = gd.concat(partdfs).sort_index()
-            return joined
-
-        shuffled = [shuffle(sr, prefixes, divs, *deps)
-                    for sr, deps in zip(sridx, grouped_parts)]
-        out = from_delayed(shuffled)
-
-        out = out.reset_index(force=True)
-        return out
-
 
 def sum_of_squares(x):
     x = x.astype('f8')._column
-    outcol = gd._gdf.apply_reduce(libgdf.gdf_sum_squared_generic, x)
-    return gd.Series(outcol)
+    outcol = cudf._gdf.apply_reduce(libgdf.gdf_sum_squared_generic, x)
+    return cudf.Series(outcol)
 
 
 def var_aggregate(x2, x, n, ddof=1):
@@ -892,32 +628,19 @@ def var_aggregate(x2, x, n, ddof=1):
 
 
 def nlargest_agg(x, **kwargs):
-    return gd.concat(x).nlargest(**kwargs)
+    return cudf.concat(x).nlargest(**kwargs)
 
 
 def nsmallest_agg(x, **kwargs):
-    return gd.concat(x).nsmallest(**kwargs)
+    return cudf.concat(x).nsmallest(**kwargs)
 
 
 def unique_k_agg(x, **kwargs):
-    return gd.concat(x).unique_k(**kwargs)
+    return cudf.concat(x).unique_k(**kwargs)
 
 
-class Series(_Frame):
-    _partition_type = gd.Series
-
-    @property
-    def dtype(self):
-        return self._meta.dtype
-
-    def astype(self, dtype):
-        if dtype == self.dtype:
-            return self
-        return self.map_partitions(M.astype, dtype=dtype)
-
-    def sum(self, split_every=False):
-        return reduction(self, chunk=M.sum, aggregate=np.sum,
-                         split_every=split_every, meta=self.dtype)
+class Series(_Frame, dd.core.Series):
+    _partition_type = cudf.Series
 
     def count(self, split_every=False):
         return reduction(self, chunk=M.count, aggregate=np.sum,
@@ -927,47 +650,6 @@ class Series(_Frame):
         sum = self.sum(split_every=split_every)
         n = self.count(split_every=split_every)
         return sum / n
-
-    def var(self, ddof=1, split_every=False):
-        sum2 = reduction(self, chunk=sum_of_squares, aggregate=np.sum,
-                         split_every=split_every, meta='f8')
-        sum = self.sum(split_every=split_every)
-        n = self.count(split_every=split_every)
-        return map_partitions(var_aggregate, sum2, sum, n, ddof=ddof,
-                              meta='f8')
-
-    def std(self, ddof=1, split_every=False):
-        var = self.var(ddof=ddof, split_every=split_every)
-        return map_partitions(np.sqrt, var, dtype=np.float64)
-
-    def min(self, split_every=False):
-        return reduction(self, chunk=M.min, aggregate=np.min,
-                         split_every=split_every, meta=self.dtype)
-
-    def max(self, split_every=False):
-        return reduction(self, chunk=M.max, aggregate=np.max,
-                         split_every=split_every, meta=self.dtype)
-
-    def ceil(self):
-        return self.map_partitions(M.ceil)
-
-    def floor(self):
-        return self.map_partitions(M.floor)
-
-    def fillna(self, value):
-        if not np.can_cast(value, self.dtype):
-            raise TypeError("fill value must match dtype of series")
-        return self.map_partitions(M.fillna, value, meta=self)
-
-    def nlargest(self, n=5, split_every=None):
-        return reduction(self, chunk=M.nlargest, aggregate=nlargest_agg,
-                         meta=self._meta, token='series-nlargest',
-                         split_every=split_every, n=n)
-
-    def nsmallest(self, n=5, split_every=None):
-        return reduction(self, chunk=M.nsmallest, aggregate=nsmallest_agg,
-                         meta=self._meta, token='series-nsmallest',
-                         split_every=split_every, n=n)
 
     def unique_k(self, k, split_every=None):
         return reduction(self, chunk=M.unique_k, aggregate=unique_k_agg,
@@ -981,18 +663,8 @@ class Series(_Frame):
     cat = CachedAccessor("cat", CategoricalAccessor)
 
 
-for op in [operator.abs, operator.add, operator.eq, operator.gt, operator.ge,
-           operator.lt, operator.le, operator.mod, operator.mul, operator.ne,
-           operator.sub, operator.truediv, operator.floordiv]:
-    Series._bind_operator(op)
-
-
-class Index(Series):
-    _partition_type = gd.dataframe.index.Index
-
-    @property
-    def index(self):
-        raise AttributeError("'Index' object has no attribute 'index'")
+class Index(Series, dd.core.Index):
+    _partition_type = cudf.dataframe.index.Index
 
 
 def splits_divisions_sorted_cudf(df, chunksize):
@@ -1040,7 +712,7 @@ def from_cudf(data, npartitions=None, chunksize=None, sort=True, name=None):
     dask_cudf.DataFrame or dask_cudf.Series
         A dask_cudf DataFrame/Series partitioned along the index
     """
-    if not isinstance(data, (gd.Series, gd.DataFrame)):
+    if not isinstance(data, (cudf.Series, cudf.DataFrame)):
         raise TypeError("Input must be a cudf DataFrame or Series")
 
     if ((npartitions is None) == (chunksize is None)):
@@ -1064,67 +736,11 @@ def from_cudf(data, npartitions=None, chunksize=None, sort=True, name=None):
     dsk = {(name, i): data[start:stop]
            for i, (start, stop) in enumerate(zip(splits[:-1], splits[1:]))}
 
-    return new_dd_object(dsk, name, data, divisions)
+    return dd.core.new_dd_object(dsk, name, data, divisions)
 
 
 def _from_pandas(df):
-    return gd.DataFrame.from_pandas(df)
-
-
-def from_delayed(dfs, meta=None, prefix='from_delayed'):
-    """ Create dask_cudf DataFrame from many Dask Delayed objects
-    Parameters
-    ----------
-    dfs : list of Delayed
-        An iterable of ``dask.delayed.Delayed`` objects, such as come from
-        ``dask.delayed`` These comprise the individual partitions of the
-        resulting dataframe.
-    meta : cudf.DataFrame, cudf.Series, or cudf.Index
-        An empty cudf object with names, dtypes, and indices matching the
-        expected output.
-    prefix : str, optional
-        Prefix to prepend to the keys.
-    """
-    from dask.delayed import Delayed, delayed
-
-    if isinstance(dfs, Delayed):
-        dfs = [dfs]
-
-    dfs = [delayed(df)
-           if not isinstance(df, Delayed) and hasattr(df, 'key')
-           else df
-           for df in dfs]
-
-    for df in dfs:
-        if not isinstance(df, Delayed):
-            raise TypeError("Expected Delayed object, got {}".format(
-                            type(df).__name__))
-
-    if meta is None:
-        meta = dfs[0].compute()
-    meta = make_meta(meta)
-
-    name = prefix + '-' + tokenize(*dfs)
-
-    dsk = merge(df.dask for df in dfs)
-    dsk.update({(name, i): (check_meta, df.key, meta, 'from_delayed')
-                for (i, df) in enumerate(dfs)})
-
-    divs = [None] * (len(dfs) + 1)
-    df = new_dd_object(dsk, name, meta, divs)
-
-    return df
-
-
-def to_delayed(df):
-    """ Create Dask Delayed objects from a dask_cudf Dataframe
-    Returns a list of delayed values, one value per partition.
-    """
-    from dask.delayed import Delayed
-
-    keys = df.__dask_keys__()
-    dsk = df.__dask_optimize__(df.dask, keys)
-    return [Delayed(k, dsk) for k in keys]
+    return cudf.DataFrame.from_pandas(df)
 
 
 def from_dask_dataframe(df):
@@ -1141,20 +757,6 @@ def from_dask_dataframe(df):
     meta = _from_pandas(df._meta)
     dummy = DataFrame(df.dask, df._name, meta, df.divisions)
     return dummy.map_partitions(_from_pandas, meta=meta)
-
-
-def _get_return_type(meta):
-    if isinstance(meta, gd.Series):
-        return Series
-    elif isinstance(meta, gd.DataFrame):
-        return DataFrame
-    elif isinstance(meta, gd.index.Index):
-        return Index
-    return Scalar
-
-
-def new_dd_object(dsk, name, meta, divisions):
-    return _get_return_type(meta)(dsk, name, meta, divisions)
 
 
 def _extract_meta(x):
@@ -1194,51 +796,6 @@ def align_partitions(args):
     if not all(df.divisions == divisions for df in dfs):
         raise NotImplementedError("Aligning mismatched partitions")
     return args
-
-
-def map_partitions(func, *args, **kwargs):
-    """ Apply Python function on each DataFrame partition.
-
-    Parameters
-    ----------
-    func : function
-        Function applied to each partition.
-    args, kwargs :
-        Arguments and keywords to pass to the function. At least one of the
-        args should be a dask_cudf object.
-    """
-    meta = kwargs.pop('meta', None)
-    if meta is not None:
-        meta = make_meta(meta)
-
-    if 'token' in kwargs:
-        name = kwargs.pop('token')
-        token = tokenize(meta, *args, **kwargs)
-    else:
-        name = funcname(func)
-        token = tokenize(func, meta, *args, **kwargs)
-    name = '{0}-{1}'.format(name, token)
-
-    args = align_partitions(args)
-
-    if meta is None:
-        meta = _emulate(func, *args, **kwargs)
-    meta = make_meta(meta)
-
-    if all(isinstance(arg, Scalar) for arg in args):
-        dask = {(name, 0):
-                (apply, func, (tuple, [(x._name, 0) for x in args]), kwargs)}
-        return Scalar(merge(dask, *[x.dask for x in args]), name, meta)
-
-    dfs = [df for df in args if isinstance(df, _Frame)]
-    dsk = {}
-    for i in range(dfs[0].npartitions):
-        values = [(x._name, i if isinstance(x, _Frame) else 0)
-                  if isinstance(x, (_Frame, Scalar)) else x for x in args]
-        dsk[(name, i)] = (apply, func, values, kwargs)
-
-    dasks = [arg.dask for arg in args if isinstance(arg, (_Frame, Scalar))]
-    return new_dd_object(merge(dsk, *dasks), name, meta, args[0].divisions)
 
 
 def reduction(args, chunk=None, aggregate=None, combine=None,
@@ -1357,4 +914,47 @@ def reduction(args, chunk=None, aggregate=None, combine=None,
         if isinstance(arg, _Frame):
             dsk.update(arg.dask)
 
-    return new_dd_object(dsk, b, meta, (None, None))
+    return dd.core.new_dd_object(dsk, b, meta, (None, None))
+
+
+@dd.core.get_parallel_type.register(cudf.DataFrame)
+def get_parallel_type_dataframe(_):
+    return DataFrame
+
+
+@dd.core.get_parallel_type.register(cudf.Series)
+def get_parallel_type_series(_):
+    return Series
+
+
+@dd.core.get_parallel_type.register(cudf.Index)
+def get_parallel_type_index(_):
+    return Index
+
+
+@dd.core.meta_nonempty.register(cudf.Series)
+def meta_nonempty_series(x):
+    s = dd.core.meta_nonempty(x.to_pandas())
+    return cudf.Series.from_pandas(s)
+
+
+@dd.core.meta_nonempty.register(cudf.DataFrame)
+def meta_nonempty_dataframe(x):
+    df = dd.core.meta_nonempty(x.to_pandas())
+    return cudf.DataFrame.from_pandas(df)
+
+
+@dd.core.make_meta.register((cudf.Series, cudf.DataFrame))
+def make_meta_dataframe(x):
+    return x.head(0)
+
+
+@dd.core.make_meta.register(cudf.Index)
+def make_meta_index(x):
+    return x[:0]
+
+
+@dd.methods.concat_dispatch.register((cudf.DataFrame, cudf.Series, cudf.Index))
+def concat_cudf(dfs, ignore_index=False, **kwargs):
+    # TODO: silently ignoring other kwargs
+    return cudf.concat(dfs, ignore_index=ignore_index)

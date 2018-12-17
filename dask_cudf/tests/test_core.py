@@ -4,6 +4,7 @@ from pandas.util.testing import assert_frame_equal
 
 import pytest
 
+import dask
 import cudf as gd
 import dask_cudf as dgd
 import dask.dataframe as dd
@@ -155,21 +156,22 @@ def test_from_dask_dataframe():
 
 @pytest.mark.parametrize('nelem', [10, 200, 1333])
 def test_set_index(nelem):
-    np.random.seed(0)
-    # Use unique index range as the sort may not be stable-ordering
-    x = np.arange(nelem)
-    np.random.shuffle(x)
-    df = pd.DataFrame({'x': x,
-                       'y': np.random.randint(0, nelem, size=nelem)})
-    ddf = dd.from_pandas(df, npartitions=2)
-    dgdf = dgd.from_dask_dataframe(ddf)
+    with dask.config.set(scheduler='single-threaded'):
+        np.random.seed(0)
+        # Use unique index range as the sort may not be stable-ordering
+        x = np.arange(nelem)
+        np.random.shuffle(x)
+        df = pd.DataFrame({'x': x,
+                           'y': np.random.randint(0, nelem, size=nelem)})
+        ddf = dd.from_pandas(df, npartitions=2)
+        dgdf = dgd.from_dask_dataframe(ddf)
 
-    expect = ddf.set_index('x').compute()
-    got = dgdf.set_index('x').compute().to_pandas()
+        expect = ddf.set_index('x').compute()
+        got = dgdf.set_index('x').compute().to_pandas()
 
-    np.testing.assert_array_equal(got.index.values, expect.index.values)
-    np.testing.assert_array_equal(got.y.values, expect.y.values)
-    assert got.columns == expect.columns
+        np.testing.assert_array_equal(got.index.values, expect.index.values)
+        np.testing.assert_array_equal(got.y.values, expect.y.values)
+        assert got.columns == expect.columns
 
 
 def assert_frame_equal_by_index_group(expect, got):
@@ -190,57 +192,33 @@ def assert_frame_equal_by_index_group(expect, got):
 
 @pytest.mark.parametrize('nelem', [10, 200, 1333])
 def test_set_index_2(nelem):
-    np.random.seed(0)
-    df = pd.DataFrame({'x': 100 + np.random.randint(0, nelem//2, size=nelem),
-                       'y': np.random.normal(size=nelem)})
-    expect = df.set_index('x').sort_index()
+    with dask.config.set(scheduler='single-threaded'):
+        np.random.seed(0)
+        df = pd.DataFrame({'x': 100 + np.random.randint(0, nelem//2, size=nelem),
+                           'y': np.random.normal(size=nelem)})
+        expect = df.set_index('x').sort_index()
 
-    dgf = dgd.from_cudf(gd.DataFrame.from_pandas(df), npartitions=4)
-    res = dgf.set_index('x')  # sort by default
-    got = res.compute().to_pandas()
+        dgf = dgd.from_cudf(gd.DataFrame.from_pandas(df), npartitions=4)
+        res = dgf.set_index('x')  # sort by default
+        got = res.compute().to_pandas()
 
-    assert_frame_equal_by_index_group(expect, got)
+        assert_frame_equal_by_index_group(expect, got)
 
 
 def test_set_index_w_series():
-    nelem = 20
-    np.random.seed(0)
-    df = pd.DataFrame({'x': 100 + np.random.randint(0, nelem//2, size=nelem),
-                       'y': np.random.normal(size=nelem)})
-    expect = df.set_index(df.x).sort_index()
+    with dask.config.set(scheduler='single-threaded'):
+        nelem = 20
+        np.random.seed(0)
+        df = pd.DataFrame({'x': 100 + np.random.randint(0, nelem//2, size=nelem),
+                           'y': np.random.normal(size=nelem)})
+        expect = df.set_index(df.x).sort_index()
 
-    dgf = dgd.from_cudf(gd.DataFrame.from_pandas(df), npartitions=4)
-    res = dgf.set_index(dgf.x)  # sort by default
-    got = res.compute().to_pandas()
+        dgf = dgd.from_cudf(gd.DataFrame.from_pandas(df), npartitions=4)
+        res = dgf.set_index(dgf.x)  # sort by default
+        got = res.compute().to_pandas()
 
-    assert set(expect.columns) == set(got.columns)
-    assert_frame_equal_by_index_group(expect, got)
-
-
-@pytest.mark.parametrize('nelem,nparts', [(10, 1),
-                                          (100, 10),
-                                          (1000, 10)])
-def test_take(nelem, nparts):
-    np.random.seed(0)
-
-    # # Use unique index range as the sort may not be stable-ordering
-    x = np.random.randint(0, nelem, size=nelem)
-    y = np.random.random(nelem)
-
-    selected = np.random.randint(0, nelem - 1, size=nelem // 2)
-
-    df = pd.DataFrame({'x': x, 'y': y})
-
-    ddf = dd.from_pandas(df, npartitions=nparts)
-    dgdf = dgd.from_dask_dataframe(ddf)
-    out = dgdf.take(gd.Series(selected), npartitions=5)
-    got = out.compute().to_pandas()
-
-    expect = df.take(selected)
-    assert 1 < out.npartitions <= 5
-    np.testing.assert_array_equal(got.index, np.arange(len(got)))
-    np.testing.assert_array_equal(got.x, expect.x)
-    np.testing.assert_array_equal(got.y, expect.y)
+        assert set(expect.columns) == set(got.columns)
+        assert_frame_equal_by_index_group(expect, got)
 
 
 def test_assign():

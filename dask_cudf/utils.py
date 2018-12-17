@@ -1,5 +1,5 @@
 import pandas as pd
-import cudf as gd
+import cudf
 import dask.dataframe as dd
 from dask.utils import asciitable
 
@@ -29,7 +29,7 @@ def make_meta(x):
     """
     if hasattr(x, '_meta'):
         return x._meta
-    if isinstance(x, (gd.Series, gd.DataFrame, gd.index.Index)):
+    if isinstance(x, (cudf.Series, cudf.DataFrame, cudf.Index)):
         out = x[:2]
         return out.copy() if hasattr(out, 'copy') else out
 
@@ -38,13 +38,13 @@ def make_meta(x):
     if isinstance(meta, (pd.DataFrame, pd.Series, pd.Index)):
         meta2 = dd.utils.meta_nonempty(meta)
         if isinstance(meta2, pd.DataFrame):
-            return gd.DataFrame.from_pandas(meta2)
+            return cudf.DataFrame.from_pandas(meta2)
         elif isinstance(meta2, pd.Series):
-            return gd.Series(meta2)
+            return cudf.Series(meta2)
         else:
             if isinstance(meta2, pd.RangeIndex):
-                return gd.index.RangeIndex(meta2.start, meta2.stop)
-            return gd.index.GenericIndex(meta2)
+                return cudf.RangeIndex(meta2.start, meta2.stop)
+            return cudf.dataframe.GenericIndex(meta2)
 
     return meta
 
@@ -65,14 +65,14 @@ def check_meta(x, meta, funcname=None):
         more helpful to users.
     """
 
-    if not isinstance(meta, (gd.Series, gd.index.Index, gd.DataFrame)):
+    if not isinstance(meta, (cudf.Series, cudf.Index, cudf.DataFrame)):
         raise TypeError("Expected partition to be DataFrame, Series, or "
                         "Index of cudf, got `%s`" % type(meta).__name__)
 
     if type(x) != type(meta):
         errmsg = ("Expected partition of type `%s` but got "
                   "`%s`" % (type(meta).__name__, type(x).__name__))
-    elif isinstance(meta, gd.DataFrame):
+    elif isinstance(meta, cudf.DataFrame):
 
         extra_cols = set(x.columns) ^ set(meta.columns)
         if extra_cols:

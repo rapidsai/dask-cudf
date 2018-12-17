@@ -4,6 +4,7 @@ import pytest
 
 import cudf as gd
 import dask_cudf as dgd
+from dask.dataframe.utils import assert_eq
 
 
 def _make_random_frame(nelem, npartitions=2):
@@ -41,4 +42,4 @@ def test_series_reduce(reducer):
 
     got = reducer(gdf.x)
     exp = reducer(df.x)
-    np.testing.assert_array_almost_equal(got.compute(), exp)
+    assert_eq(got, exp)

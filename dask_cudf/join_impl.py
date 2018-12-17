@@ -1,7 +1,7 @@
 from functools import partial
 
 import numpy as np
-import cudf as gd
+import cudf
 from dask import delayed
 
 from dask_cudf import core
@@ -30,7 +30,7 @@ def get_subgroup(groups, i):
 def concat(*frames):
     frames = list(filter(len, frames))
     if len(frames) > 1:
-        return gd.concat(frames)
+        return cudf.concat(frames)
     elif len(frames) == 1:
         return frames[0]
     else:
@@ -65,7 +65,7 @@ def join_frames(left, right, on, how, lsuffix, rsuffix):
     assert how == 'left'
 
     def fix_left(df):
-        newdf = gd.DataFrame()
+        newdf = cudf.DataFrame()
         df = df.reset_index()
         for k in on:
             newdf[k] = df[k]
@@ -77,12 +77,12 @@ def join_frames(left, right, on, how, lsuffix, rsuffix):
 
     def nullcolumn(nelem, dtype):
         data = np.zeros(nelem, dtype=dtype)
-        mask_size = gd.utils.calc_chunk_size(
+        mask_size = cudf.utils.utils.calc_chunk_size(
             data.size,
-            gd.utils.mask_bitsize,
+            cudf.utils.utils.mask_bitsize,
             )
-        mask = np.zeros(mask_size, dtype=gd.utils.mask_dtype)
-        sr = gd.Series.from_masked_array(
+        mask = np.zeros(mask_size, dtype=cudf.utils.utils.mask_dtype)
+        sr = cudf.Series.from_masked_array(
             data=data,
             mask=mask,
             null_count=data.size,
@@ -90,7 +90,7 @@ def join_frames(left, right, on, how, lsuffix, rsuffix):
         return sr
 
     def make_empty():
-        df = gd.DataFrame()
+        df = cudf.DataFrame()
         for k in on:
             df[k] = np.asarray([], dtype=dtypes[k])
         for k in left_val_names:
