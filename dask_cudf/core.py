@@ -28,15 +28,18 @@ from dask import compute
 
 from dask_cudf.utils import make_meta, check_meta
 from dask_cudf import batcher_sortnet, join_impl
-from dask_cudf.accessor import DatetimeAccessor, CategoricalAccessor,\
-    CachedAccessor
+from dask_cudf.accessor import DatetimeAccessor, CategoricalAccessor, CachedAccessor
 
 
 def optimize(dsk, keys, **kwargs):
     flatkeys = list(flatten(keys)) if isinstance(keys, list) else [keys]
     dsk, dependencies = cull(dsk, flatkeys)
-    dsk, dependencies = fuse(dsk, keys, dependencies=dependencies,
-                             ave_width=_globals.get('fuse_ave_width', 1))
+    dsk, dependencies = fuse(
+        dsk,
+        keys,
+        dependencies=dependencies,
+        ave_width=_globals.get("fuse_ave_width", 1),
+    )
     dsk, _ = cull(dsk, keys)
     return dsk
 
@@ -61,6 +64,7 @@ class _Frame(dd.core._Frame, OperatorMethodMixin):
     divisions : tuple of index values
         Values along which we partition our blocks on the index
     """
+
     __dask_scheduler__ = staticmethod(dask.get)
     __dask_optimize__ = staticmethod(optimize)
 
@@ -75,9 +79,10 @@ class _Frame(dd.core._Frame, OperatorMethodMixin):
         self._name = name
         meta = make_meta(meta)
         if not isinstance(meta, self._partition_type):
-            raise TypeError("Expected meta to specify type {0}, got type "
-                            "{1}".format(self._partition_type.__name__,
-                                         type(meta).__name__))
+            raise TypeError(
+                "Expected meta to specify type {0}, got type "
+                "{1}".format(self._partition_type.__name__, type(meta).__name__)
+            )
         self._meta = meta
         self.divisions = tuple(divisions)
 
@@ -122,12 +127,11 @@ def concat_indexed_dataframes(dfs):
 
     dfs2, divisions, parts = align_partitions(*dfs)
 
-    name = 'concat-indexed-' + tokenize(*dfs)
+    name = "concat-indexed-" + tokenize(*dfs)
 
     parts2 = [[df for df in part] for part in parts]
 
-    dsk = dict(((name, i), (cudf.concat, part))
-               for i, part in enumerate(parts2))
+    dsk = dict(((name, i), (cudf.concat, part)) for i, part in enumerate(parts2))
     for df in dfs2:
         dsk.update(df.dask)
 
@@ -138,7 +142,7 @@ def stack_partitions(dfs, divisions):
     """Concatenate partitions on axis=0 by doing a simple stack"""
     meta = cudf.concat(_extract_meta(dfs))
 
-    name = 'concat-{0}'.format(tokenize(*dfs))
+    name = "concat-{0}".format(tokenize(*dfs))
     dsk = {}
     i = 0
     for df in dfs:
@@ -166,8 +170,9 @@ def concat(objs, interleave_partitions=False):
         return dfs[0]
 
     if all(df.known_divisions for df in dfs):
-        if all(dfs[i].divisions[-1] < dfs[i + 1].divisions[0]
-                for i in range(len(dfs) - 1)):
+        if all(
+            dfs[i].divisions[-1] < dfs[i + 1].divisions[0] for i in range(len(dfs) - 1)
+        ):
             divisions = []
             for df in dfs[:-1]:
                 # remove last to concatenate with next
@@ -209,16 +214,17 @@ class DataFrame(_Frame, dd.core.DataFrame):
 
     def apply_rows(self, func, incols, outcols, kwargs={}, cache_key=None):
         import uuid
+
         if cache_key is None:
             cache_key = uuid.uuid4()
 
         def do_apply_rows(df, func, incols, outcols, kwargs):
-            return df.apply_rows(func, incols, outcols, kwargs,
-                                 cache_key=cache_key)
+            return df.apply_rows(func, incols, outcols, kwargs, cache_key=cache_key)
 
         meta = do_apply_rows(self._meta, func, incols, outcols, kwargs)
-        return self.map_partitions(do_apply_rows, func, incols, outcols,
-                                   kwargs, meta=meta)
+        return self.map_partitions(
+            do_apply_rows, func, incols, outcols, kwargs, meta=meta
+        )
 
     def query(self, expr):
         """Query with a boolean expression using Numba to compile a GPU kernel.
@@ -236,13 +242,9 @@ class DataFrame(_Frame, dd.core.DataFrame):
         filtered :  DataFrame
         """
         if "@" in expr:
-            raise NotImplementedError("Using variables from the calling "
-                                      "environment")
+            raise NotImplementedError("Using variables from the calling " "environment")
         # Empty calling environment
-        callenv = {
-            'locals': {},
-            'globals': {},
-        }
+        callenv = {"locals": {}, "globals": {}}
         return self.map_partitions(query, expr, callenv, meta=self._meta)
 
     def groupby(self, by, method="hash"):
@@ -250,35 +252,31 @@ class DataFrame(_Frame, dd.core.DataFrame):
 
         return Groupby(df=self, by=by, method=method)
 
-    def merge(self, other, on=None, how='left', lsuffix='_x', rsuffix='_y'):
+    def merge(self, other, on=None, how="left", lsuffix="_x", rsuffix="_y"):
         """Merging two dataframes on the column(s) indicated in *on*.
         """
-        assert how == 'left', 'left join is impelemented'
+        assert how == "left", "left join is impelemented"
         if on is None:
             return self.join(other, how=how, lsuffix=lsuffix, rsuffix=rsuffix)
         else:
             return join_impl.join_frames(
-                left=self,
-                right=other,
-                on=on,
-                how=how,
-                lsuffix=lsuffix,
-                rsuffix=rsuffix,
-                )
+                left=self, right=other, on=on, how=how, lsuffix=lsuffix, rsuffix=rsuffix
+            )
 
-    def join(self, other, how='left', lsuffix='', rsuffix=''):
+    def join(self, other, how="left", lsuffix="", rsuffix=""):
         """Join two datatframes
 
         *on* is not supported.
         """
-        if how == 'right':
-            return other.join(other=self, how='left', lsuffix=rsuffix,
-                              rsuffix=lsuffix)
+        if how == "right":
+            return other.join(other=self, how="left", lsuffix=rsuffix, rsuffix=lsuffix)
 
         same_names = set(self.columns) & set(other.columns)
         if same_names and not (lsuffix or rsuffix):
-            raise ValueError('there are overlapping columns but '
-                             'lsuffix and rsuffix are not defined')
+            raise ValueError(
+                "there are overlapping columns but "
+                "lsuffix and rsuffix are not defined"
+            )
 
         left, leftuniques = self._align_divisions()
         right, rightuniques = other._align_to_indices(leftuniques)
@@ -288,8 +286,9 @@ class DataFrame(_Frame, dd.core.DataFrame):
 
         @delayed
         def part_join(left, right, how):
-            return left.join(right, how=how, sort=True,
-                             lsuffix=lsuffix, rsuffix=rsuffix)
+            return left.join(
+                right, how=how, sort=True, lsuffix=lsuffix, rsuffix=rsuffix
+            )
 
         def inner_selector():
             pivot = 0
@@ -311,13 +310,9 @@ class DataFrame(_Frame, dd.core.DataFrame):
                 else:
                     yield leftparts[i], None
 
-        selector = {
-            'left': left_selector,
-            'inner': inner_selector,
-        }[how]
+        selector = {"left": left_selector, "inner": inner_selector}[how]
 
-        rhs_dtypes = [(k, other._meta.dtypes[k])
-                      for k in other._meta.columns]
+        rhs_dtypes = [(k, other._meta.dtypes[k]) for k in other._meta.columns]
 
         @delayed
         def fix_column(lhs):
@@ -327,24 +322,24 @@ class DataFrame(_Frame, dd.core.DataFrame):
 
             for k, dtype in rhs_dtypes:
                 data = np.zeros(len(lhs), dtype=dtype)
-                mask_size = cudf.utils.calc_chunk_size(data.size,
-                                                     cudf.utils.mask_bitsize)
+                mask_size = cudf.utils.calc_chunk_size(
+                    data.size, cudf.utils.mask_bitsize
+                )
                 mask = np.zeros(mask_size, dtype=cudf.utils.mask_dtype)
-                sr = cudf.Series.from_masked_array(data=data,
-                                                 mask=mask,
-                                                 null_count=data.size)
+                sr = cudf.Series.from_masked_array(
+                    data=data, mask=mask, null_count=data.size
+                )
 
                 df[k + rsuffix] = sr.set_index(df.index)
 
             return df
 
-        joinedparts = [(part_join(lhs, rhs, how=how)
-                        if rhs is not None
-                        else fix_column(lhs))
-                       for lhs, rhs in selector()]
+        joinedparts = [
+            (part_join(lhs, rhs, how=how) if rhs is not None else fix_column(lhs))
+            for lhs, rhs in selector()
+        ]
 
-        meta = self._meta.join(other._meta, how=how,
-                               lsuffix=lsuffix, rsuffix=rsuffix)
+        meta = self._meta.join(other._meta, how=how, lsuffix=lsuffix, rsuffix=rsuffix)
         return from_delayed(joinedparts, meta=meta)
 
     def _align_divisions(self):
@@ -369,9 +364,7 @@ class DataFrame(_Frame, dd.core.DataFrame):
         # Fix empty partitions
         uniques = list(filter(bool, uniques))
 
-        return self._align_to_indices(uniques,
-                                      originals=originals,
-                                      parts=parts)
+        return self._align_to_indices(uniques, originals=originals, parts=parts)
 
     def _get_unique_indices(self, parts=None):
         if parts is None:
@@ -469,24 +462,25 @@ class DataFrame(_Frame, dd.core.DataFrame):
             Whether the new index column is already sorted.
         """
         if not drop:
-            raise NotImplementedError('drop=False not supported yet')
+            raise NotImplementedError("drop=False not supported yet")
 
         if isinstance(index, str):
             tmpdf = self.sort_values(index)
             return tmpdf._set_column_as_sorted_index(index, drop=drop)
         elif isinstance(index, Series):
-            indexname = '__dask_cudf.index'
+            indexname = "__dask_cudf.index"
             df = self.assign(**{indexname: index})
             return df.set_index(indexname, drop=drop, sorted=sorted)
         else:
-            raise TypeError('cannot set_index from {}'.format(type(index)))
+            raise TypeError("cannot set_index from {}".format(type(index)))
 
     def _set_column_as_sorted_index(self, colname, drop):
         def select_index(df, col):
             return df.set_index(col)
 
-        return self.map_partitions(select_index, col=colname,
-                                   meta=self._meta.set_index(colname))
+        return self.map_partitions(
+            select_index, col=colname, meta=self._meta.set_index(colname)
+        )
 
     def _argsort(self, col, sorted=False):
         """
@@ -500,7 +494,7 @@ class DataFrame(_Frame, dd.core.DataFrame):
         subset = self[col].to_dask_dataframe()
         subset = subset.reset_index(drop=False)
         ordered = subset.set_index(0, sorted=sorted)
-        shufidx = from_dask_dataframe(ordered)['index']
+        shufidx = from_dask_dataframe(ordered)["index"]
         return shufidx
 
     def _set_index_raw(self, indexname, drop, sorted):
@@ -522,17 +516,18 @@ class DataFrame(_Frame, dd.core.DataFrame):
             @delayed
             def fix_index(df, startpos):
                 stoppos = startpos + len(df)
-                return df.set_index(cudf.dataframe.RangeIndex(start=startpos,
-                                                              stop=stoppos))
+                return df.set_index(
+                    cudf.dataframe.RangeIndex(start=startpos, stop=stoppos)
+                )
 
-            outdfs = [fix_index(df, startpos)
-                      for df, startpos in zip(dfs, prefixes)]
+            outdfs = [fix_index(df, startpos) for df, startpos in zip(dfs, prefixes)]
             return from_delayed(outdfs, meta=self._meta.reset_index())
         else:
+
             def reset_index(df):
                 return df.reset_index()
-            return self.map_partitions(reset_index,
-                                       meta=reset_index(self._meta))
+
+            return self.map_partitions(reset_index, meta=reset_index(self._meta))
 
     def sort_values(self, by, ignore_index=False):
         """Sort by the given column
@@ -543,10 +538,9 @@ class DataFrame(_Frame, dd.core.DataFrame):
         """
         parts = self.to_delayed()
         sorted_parts = batcher_sortnet.sort_delayed_frame(parts, by)
-        return from_delayed(
-            sorted_parts,
-            meta=self._meta
-        ).reset_index(force=not ignore_index)
+        return from_delayed(sorted_parts, meta=self._meta).reset_index(
+            force=not ignore_index
+        )
 
     def sort_values_binned(self, by):
         """Sorty by the given column and ensure that the same key
@@ -559,6 +553,7 @@ class DataFrame(_Frame, dd.core.DataFrame):
         @delayed
         def get_unique(p):
             return set(p[by].unique())
+
         uniques = list(compute(*map(get_unique, parts)))
 
         joiner = {}
@@ -576,19 +571,17 @@ class DataFrame(_Frame, dd.core.DataFrame):
 
         @delayed
         def join(df, other, keys):
-            others = [other.query('{by}==@k'.format(by=by))
-                      for k in sorted(keys)]
+            others = [other.query("{by}==@k".format(by=by)) for k in sorted(keys)]
             return cudf.concat([df] + others)
 
         @delayed
         def drop(df, keep_keys):
             locvars = locals()
             for i, k in enumerate(keep_keys):
-                locvars['k{}'.format(i)] = k
+                locvars["k{}".format(i)] = k
 
-            conds = ['{by}==@k{i}'.format(by=by, i=i)
-                     for i in range(len(keep_keys))]
-            expr = ' or '.join(conds)
+            conds = ["{by}==@k{i}".format(by=by, i=i) for i in range(len(keep_keys))]
+            expr = " or ".join(conds)
             return df.query(expr)
 
         for i in range(len(parts)):
@@ -612,14 +605,14 @@ class DataFrame(_Frame, dd.core.DataFrame):
 
 
 def sum_of_squares(x):
-    x = x.astype('f8')._column
+    x = x.astype("f8")._column
     outcol = cudf._gdf.apply_reduce(libgdf.gdf_sum_squared_generic, x)
     return cudf.Series(outcol)
 
 
 def var_aggregate(x2, x, n, ddof=1):
     try:
-        result = (x2 / n) - (x / n)**2
+        result = (x2 / n) - (x / n) ** 2
         if ddof != 0:
             result = result * n / (n - ddof)
         return result
@@ -643,8 +636,9 @@ class Series(_Frame, dd.core.Series):
     _partition_type = cudf.Series
 
     def count(self, split_every=False):
-        return reduction(self, chunk=M.count, aggregate=np.sum,
-                         split_every=split_every, meta='i8')
+        return reduction(
+            self, chunk=M.count, aggregate=np.sum, split_every=split_every, meta="i8"
+        )
 
     def mean(self, split_every=False):
         sum = self.sum(split_every=split_every)
@@ -652,9 +646,15 @@ class Series(_Frame, dd.core.Series):
         return sum / n
 
     def unique_k(self, k, split_every=None):
-        return reduction(self, chunk=M.unique_k, aggregate=unique_k_agg,
-                         meta=self._meta, token='unique-k',
-                         split_every=split_every, k=k)
+        return reduction(
+            self,
+            chunk=M.unique_k,
+            aggregate=unique_k_agg,
+            meta=self._meta,
+            token="unique-k",
+            split_every=split_every,
+            k=k,
+        )
 
     # ----------------------------------------------------------------------
     # Accessor Methods
@@ -715,16 +715,17 @@ def from_cudf(data, npartitions=None, chunksize=None, sort=True, name=None):
     if not isinstance(data, (cudf.Series, cudf.DataFrame)):
         raise TypeError("Input must be a cudf DataFrame or Series")
 
-    if ((npartitions is None) == (chunksize is None)):
-        raise ValueError('Exactly one of npartitions and chunksize must '
-                         'be specified.')
+    if (npartitions is None) == (chunksize is None):
+        raise ValueError(
+            "Exactly one of npartitions and chunksize must " "be specified."
+        )
 
     nrows = len(data)
 
     if chunksize is None:
         chunksize = int(ceil(nrows / npartitions))
 
-    name = name or ('from_cudf-' + uuid4().hex)
+    name = name or ("from_cudf-" + uuid4().hex)
 
     if sort:
         data = data.sort_index(ascending=True)
@@ -733,8 +734,10 @@ def from_cudf(data, npartitions=None, chunksize=None, sort=True, name=None):
         splits = list(range(0, nrows, chunksize)) + [len(data)]
         divisions = (None,) * len(splits)
 
-    dsk = {(name, i): data[start:stop]
-           for i, (start, stop) in enumerate(zip(splits[:-1], splits[1:]))}
+    dsk = {
+        (name, i): data[start:stop]
+        for i, (start, stop) in enumerate(zip(splits[:-1], splits[1:]))
+    }
 
     return dd.core.new_dd_object(dsk, name, data, divisions)
 
@@ -750,7 +753,7 @@ def from_dask_dataframe(df):
     ----------
     df : dask.dataframe.DataFrame
     """
-    bad_cols = df.select_dtypes(include=['O'])
+    bad_cols = df.select_dtypes(include=["O"])
     if len(bad_cols.columns):
         raise ValueError("Object dtypes aren't supported by cudf")
 
@@ -798,10 +801,19 @@ def align_partitions(args):
     return args
 
 
-def reduction(args, chunk=None, aggregate=None, combine=None,
-              meta=None, token=None, chunk_kwargs=None,
-              aggregate_kwargs=None, combine_kwargs=None,
-              split_every=None, **kwargs):
+def reduction(
+    args,
+    chunk=None,
+    aggregate=None,
+    combine=None,
+    meta=None,
+    token=None,
+    chunk_kwargs=None,
+    aggregate_kwargs=None,
+    combine_kwargs=None,
+    split_every=None,
+    **kwargs
+):
     """Generic tree reduction operation.
 
     Parameters
@@ -854,8 +866,7 @@ def reduction(args, chunk=None, aggregate=None, combine=None,
     if not isinstance(args, (tuple, list)):
         args = [args]
 
-    npartitions = set(arg.npartitions for arg in args
-                      if isinstance(arg, _Frame))
+    npartitions = set(arg.npartitions for arg in args if isinstance(arg, _Frame))
     if len(npartitions) > 1:
         raise ValueError("All arguments must have same number of partitions")
     npartitions = npartitions.pop()
@@ -867,23 +878,33 @@ def reduction(args, chunk=None, aggregate=None, combine=None,
     elif split_every < 2 or not isinstance(split_every, int):
         raise ValueError("split_every must be an integer >= 2")
 
-    token_key = tokenize(token or (chunk, aggregate), meta, args,
-                         chunk_kwargs, aggregate_kwargs, combine_kwargs,
-                         split_every)
+    token_key = tokenize(
+        token or (chunk, aggregate),
+        meta,
+        args,
+        chunk_kwargs,
+        aggregate_kwargs,
+        combine_kwargs,
+        split_every,
+    )
 
     # Chunk
-    a = '{0}-chunk-{1}'.format(token or funcname(chunk), token_key)
+    a = "{0}-chunk-{1}".format(token or funcname(chunk), token_key)
     if len(args) == 1 and isinstance(args[0], _Frame) and not chunk_kwargs:
-        dsk = {(a, 0, i): (chunk, key)
-               for i, key in enumerate(args[0].__dask_keys__())}
+        dsk = {(a, 0, i): (chunk, key) for i, key in enumerate(args[0].__dask_keys__())}
     else:
-        dsk = {(a, 0, i): (apply, chunk,
-                           [(x._name, i) if isinstance(x, _Frame)
-                            else x for x in args], chunk_kwargs)
-               for i in range(args[0].npartitions)}
+        dsk = {
+            (a, 0, i): (
+                apply,
+                chunk,
+                [(x._name, i) if isinstance(x, _Frame) else x for x in args],
+                chunk_kwargs,
+            )
+            for i in range(args[0].npartitions)
+        }
 
     # Combine
-    b = '{0}-combine-{1}'.format(token or funcname(combine), token_key)
+    b = "{0}-combine-{1}".format(token or funcname(combine), token_key)
     k = npartitions
     depth = 0
     while k > split_every:
@@ -891,13 +912,15 @@ def reduction(args, chunk=None, aggregate=None, combine=None,
             conc = (list, [(a, depth, i) for i in inds])
             dsk[(b, depth + 1, part_i)] = (
                 (apply, combine, [conc], combine_kwargs)
-                if combine_kwargs else (combine, conc))
+                if combine_kwargs
+                else (combine, conc)
+            )
         k = part_i + 1
         a = b
         depth += 1
 
     # Aggregate
-    b = '{0}-agg-{1}'.format(token or funcname(aggregate), token_key)
+    b = "{0}-agg-{1}".format(token or funcname(aggregate), token_key)
     conc = (list, [(a, depth, i) for i in range(k)])
     if aggregate_kwargs:
         dsk[(b, 0)] = (apply, aggregate, [conc], aggregate_kwargs)
@@ -906,8 +929,7 @@ def reduction(args, chunk=None, aggregate=None, combine=None,
 
     if meta is None:
         meta_chunk = _emulate(apply, chunk, args, chunk_kwargs)
-        meta = _emulate(apply, aggregate, [[meta_chunk]],
-                        aggregate_kwargs)
+        meta = _emulate(apply, aggregate, [[meta_chunk]], aggregate_kwargs)
     meta = make_meta(meta)
 
     for arg in args:

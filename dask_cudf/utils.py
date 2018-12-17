@@ -27,11 +27,11 @@ def make_meta(x):
     >>> make_meta('i8')
     1
     """
-    if hasattr(x, '_meta'):
+    if hasattr(x, "_meta"):
         return x._meta
     if isinstance(x, (cudf.Series, cudf.DataFrame, cudf.Index)):
         out = x[:2]
-        return out.copy() if hasattr(out, 'copy') else out
+        return out.copy() if hasattr(out, "copy") else out
 
     meta = dd.utils.make_meta(x)
 
@@ -66,38 +66,47 @@ def check_meta(x, meta, funcname=None):
     """
 
     if not isinstance(meta, (cudf.Series, cudf.Index, cudf.DataFrame)):
-        raise TypeError("Expected partition to be DataFrame, Series, or "
-                        "Index of cudf, got `%s`" % type(meta).__name__)
+        raise TypeError(
+            "Expected partition to be DataFrame, Series, or "
+            "Index of cudf, got `%s`" % type(meta).__name__
+        )
 
     if type(x) != type(meta):
-        errmsg = ("Expected partition of type `%s` but got "
-                  "`%s`" % (type(meta).__name__, type(x).__name__))
+        errmsg = "Expected partition of type `%s` but got " "`%s`" % (
+            type(meta).__name__,
+            type(x).__name__,
+        )
     elif isinstance(meta, cudf.DataFrame):
 
         extra_cols = set(x.columns) ^ set(meta.columns)
         if extra_cols:
             errmsg = "extra columns"
         else:
-            bad = [(col, x[col].dtype, meta[col].dtype) for col in x.columns
-                   if not series_type_eq(x[col], meta[col])]
+            bad = [
+                (col, x[col].dtype, meta[col].dtype)
+                for col in x.columns
+                if not series_type_eq(x[col], meta[col])
+            ]
 
             if not bad:
                 return x
-            errmsg = ("Partition type: `%s`\n%s" %
-                      (type(meta).__name__,
-                       asciitable(['Column', 'Found', 'Expected'], bad)))
+            errmsg = "Partition type: `%s`\n%s" % (
+                type(meta).__name__,
+                asciitable(["Column", "Found", "Expected"], bad),
+            )
     else:
         if series_type_eq(x, meta):
             return x
 
-        errmsg = ("Partition type: `%s`\n%s" %
-                  (type(meta).__name__,
-                   asciitable(['', 'dtype'], [('Found', x.dtype),
-                                              ('Expected', meta.dtype)])))
+        errmsg = "Partition type: `%s`\n%s" % (
+            type(meta).__name__,
+            asciitable(["", "dtype"], [("Found", x.dtype), ("Expected", meta.dtype)]),
+        )
 
-    raise ValueError("Metadata mismatch found%s.\n\n"
-                     "%s" % ((" in `%s`" % funcname if funcname else ""),
-                             errmsg))
+    raise ValueError(
+        "Metadata mismatch found%s.\n\n"
+        "%s" % ((" in `%s`" % funcname if funcname else ""), errmsg)
+    )
 
 
 def series_type_eq(a, b):

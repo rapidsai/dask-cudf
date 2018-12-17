@@ -9,7 +9,8 @@ from dask_cudf import from_delayed
 class Groupby(object):
     """The object returned by ``df.groupby()``.
     """
-    _magic_token = '__@__'
+
+    _magic_token = "__@__"
 
     def __init__(self, df, by, method):
         self._df = df
@@ -55,12 +56,10 @@ class Groupby(object):
         # Adjust *mapping* for custom prefix.
         mapping = {self._magic_token + k: v for k, v in mapping.items()}
         return self._aggregation(
-            lambda df: df.agg(mapping),
-            lambda df: df.agg(mapping),
-            prefix=prefix,
-            )
+            lambda df: df.agg(mapping), lambda df: df.agg(mapping), prefix=prefix
+        )
 
-    def _aggregation(self, chunk, combine, split_every=4, prefix=''):
+    def _aggregation(self, chunk, combine, split_every=4, prefix=""):
         by = self._by
         method = self._method
         magic_token = self._magic_token
@@ -85,7 +84,7 @@ class Groupby(object):
             for k in df.columns:
                 if magic_token in k:
                     _, name = k.split(magic_token, 1)
-                    newk = '_'.join([prefix[name], name])
+                    newk = "_".join([prefix[name], name])
                 else:
                     newk = k
                 newdf[newk] = df[k]
@@ -110,8 +109,7 @@ class Groupby(object):
 
         @delayed
         def do_combine(dfs, method):
-            return drop_prefix(combine(gd.concat(dfs).groupby(
-                by=by, method=method)))
+            return drop_prefix(combine(gd.concat(dfs).groupby(by=by, method=method)))
 
         meta = drop_prefix(chunk(rename(self._df._meta).groupby(by=by)))
         meta = fix_name(combine(meta.groupby(by=by)))
@@ -150,6 +148,7 @@ class Groupby(object):
     def apply(self, function):
         """Transform each group using a python function.
         """
+
         @delayed
         def apply_to_group(grp):
             return grp.apply(function)
@@ -162,6 +161,7 @@ class Groupby(object):
 
         Calls ``cudf.Groupby.apply_grouped`` concurrently
         """
+
         @delayed
         def apply_to_group(grp):
             return grp.apply_grouped(*args, **kwargs)
@@ -172,14 +172,10 @@ class Groupby(object):
     # Aggregation APIs
 
     def count(self):
-        return self._aggregation(lambda g: g.count(),
-                                 lambda g: g.sum(),
-                                 prefix='count')
+        return self._aggregation(lambda g: g.count(), lambda g: g.sum(), prefix="count")
 
     def sum(self):
-        return self._aggregation(lambda g: g.sum(),
-                                 lambda g: g.sum(),
-                                 prefix='sum')
+        return self._aggregation(lambda g: g.sum(), lambda g: g.sum(), prefix="sum")
 
     def mean(self):
         valcols = set(self._df.columns) - set(self._by)
@@ -187,25 +183,23 @@ class Groupby(object):
         def combine(df):
             outdf = df[:1].loc[:, list(self._by)].reset_index()
             for k in valcols:
-                sumk = '{}_sum'.format(k)
-                countk = '{}_count'.format(k)
+                sumk = "{}_sum".format(k)
+                countk = "{}_count".format(k)
                 outdf[k] = df[sumk].sum() / df[countk].sum()
             return outdf
 
-        return self._aggregation(lambda g: g.agg(['sum', 'count']),
-                                 lambda g: g.apply(combine),
-                                 split_every=None,
-                                 prefix='mean')
+        return self._aggregation(
+            lambda g: g.agg(["sum", "count"]),
+            lambda g: g.apply(combine),
+            split_every=None,
+            prefix="mean",
+        )
 
     def max(self):
-        return self._aggregation(lambda g: g.max(),
-                                 lambda g: g.max(),
-                                 prefix='max')
+        return self._aggregation(lambda g: g.max(), lambda g: g.max(), prefix="max")
 
     def min(self):
-        return self._aggregation(lambda g: g.min(),
-                                 lambda g: g.min(),
-                                 prefix='min')
+        return self._aggregation(lambda g: g.min(), lambda g: g.min(), prefix="min")
 
     def _compute_std_or_var(self, ddof=1, do_std=False):
         valcols = set(self._df.columns) - set(self._by)
@@ -213,9 +207,9 @@ class Groupby(object):
         def combine(df):
             outdf = df[:1].loc[:, list(self._by)].reset_index()
             for k in valcols:
-                sosk = '{}_sum_of_squares'.format(k)
-                sumk = '{}_sum'.format(k)
-                countk = '{}_count'.format(k)
+                sosk = "{}_sum_of_squares".format(k)
+                sumk = "{}_sum".format(k)
+                countk = "{}_count".format(k)
                 the_sos = df[sosk].sum()
                 the_sum = df[sumk].sum()
                 the_count = df[countk].sum()
@@ -229,9 +223,10 @@ class Groupby(object):
             return outdf
 
         return self._aggregation(
-            lambda g: g.agg(['sum_of_squares', 'sum', 'count']),
+            lambda g: g.agg(["sum_of_squares", "sum", "count"]),
             lambda g: g.apply(combine),
-            split_every=None)
+            split_every=None,
+        )
 
     def std(self, ddof=1):
         return self._compute_std_or_var(ddof=ddof, do_std=True)

@@ -11,17 +11,17 @@ import pandas as pd
 
 
 def data_dt_1():
-    return pd.date_range('20010101', '20020215', freq='400h')
+    return pd.date_range("20010101", "20020215", freq="400h")
 
 
 def data_dt_2():
     return np.random.randn(100)
 
 
-dt_fields = ['year', 'month', 'day', 'hour', 'minute', 'second']
+dt_fields = ["year", "month", "day", "hour", "minute", "second"]
 
 
-@pytest.mark.parametrize('data', [data_dt_2()])
+@pytest.mark.parametrize("data", [data_dt_2()])
 @pytest.mark.xfail(raises=AttributeError)
 def test_datetime_accessor_initialization(data):
     pdsr = pd.Series(data.copy())
@@ -30,27 +30,23 @@ def test_datetime_accessor_initialization(data):
     dsr.dt
 
 
-@pytest.mark.parametrize('data', [data_dt_1()])
+@pytest.mark.parametrize("data", [data_dt_1()])
 def test_series(data):
     pdsr = pd.Series(data.copy())
     sr = Series(pdsr)
     dsr = dgd.from_cudf(sr, npartitions=5)
 
-    np.testing.assert_equal(
-        np.array(pdsr),
-        np.array(dsr.compute()),
-    )
+    np.testing.assert_equal(np.array(pdsr), np.array(dsr.compute()))
 
 
-@pytest.mark.parametrize('data', [data_dt_1()])
-@pytest.mark.parametrize('field', dt_fields)
+@pytest.mark.parametrize("data", [data_dt_1()])
+@pytest.mark.parametrize("field", dt_fields)
 def test_dt_series(data, field):
     pdsr = pd.Series(data.copy())
     sr = Series(pdsr)
     dsr = dgd.from_cudf(sr, npartitions=5)
     base = getattr(pdsr.dt, field)
-    test = getattr(dsr.dt, field).compute()\
-                                 .to_pandas().astype('int64')
+    test = getattr(dsr.dt, field).compute().to_pandas().astype("int64")
     assert_series_equal(base, test)
 
 
@@ -60,7 +56,7 @@ def test_dt_series(data, field):
 
 
 def data_cat_1():
-    cat = pd.Categorical(['a', 'a', 'b', 'c', 'a'], categories=['a', 'b', 'c'])
+    cat = pd.Categorical(["a", "a", "b", "c", "a"], categories=["a", "b", "c"])
     return cat
 
 
@@ -69,14 +65,16 @@ def data_cat_2():
 
 
 def data_cat_3():
-    cat1 = pd.Categorical(['a', 'a', 'b', 'c', 'a'],
-                          categories=['a', 'b', 'c'], ordered=True)
-    cat2 = pd.Categorical(['a', 'b', 'a', 'c', 'b'],
-                          categories=['a', 'b', 'c'], ordered=True)
+    cat1 = pd.Categorical(
+        ["a", "a", "b", "c", "a"], categories=["a", "b", "c"], ordered=True
+    )
+    cat2 = pd.Categorical(
+        ["a", "b", "a", "c", "b"], categories=["a", "b", "c"], ordered=True
+    )
     return cat1, cat2
 
 
-@pytest.mark.parametrize('data', [data_cat_2()])
+@pytest.mark.parametrize("data", [data_cat_2()])
 @pytest.mark.xfail(raises=AttributeError)
 def test_categorical_accessor_initialization(data):
     sr = Series(data.copy())
@@ -85,7 +83,7 @@ def test_categorical_accessor_initialization(data):
 
 
 @pytest.mark.xfail(reason="")
-@pytest.mark.parametrize('data', [data_cat_1()])
+@pytest.mark.parametrize("data", [data_cat_1()])
 def test_categorical_basic(data):
     cat = data.copy()
     pdsr = pd.Series(cat)
@@ -117,7 +115,7 @@ def test_categorical_basic(data):
 
 
 @pytest.mark.xfail(reason="")
-@pytest.mark.parametrize('data', [data_cat_1()])
+@pytest.mark.parametrize("data", [data_cat_1()])
 def test_categorical_compare_unordered(data):
     cat = data.copy()
     pdsr = pd.Series(cat)
@@ -149,7 +147,7 @@ def test_categorical_compare_unordered(data):
     raises.match("Unordered Categoricals can only compare equality or not")
 
 
-@pytest.mark.parametrize('data', [data_cat_3()])
+@pytest.mark.parametrize("data", [data_cat_3()])
 def test_categorical_compare_ordered(data):
     cat1 = data[0]
     cat2 = data[1]

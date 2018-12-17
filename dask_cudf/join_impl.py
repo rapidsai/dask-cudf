@@ -11,10 +11,7 @@ from dask_cudf import core
 def local_shuffle(frame, num_new_parts, key_columns):
     """Regroup the frame based on the key column(s)
     """
-    partitions = frame.partition_by_hash(
-        columns=key_columns,
-        nparts=num_new_parts,
-        )
+    partitions = frame.partition_by_hash(columns=key_columns, nparts=num_new_parts)
     return dict(enumerate(partitions))
 
 
@@ -40,13 +37,15 @@ def concat(*frames):
 def group_frame(frame_partitions, num_new_parts, key_columns):
     """Group frame to prepare for the join
     """
-    return [local_shuffle(part, num_new_parts, key_columns)
-            for part in frame_partitions]
+    return [
+        local_shuffle(part, num_new_parts, key_columns) for part in frame_partitions
+    ]
 
 
 def fanout_subgroups(grouped_parts, num_new_parts):
-    return [[get_subgroup(part, j) for part in grouped_parts]
-            for j in range(num_new_parts)]
+    return [
+        [get_subgroup(part, j) for part in grouped_parts] for j in range(num_new_parts)
+    ]
 
 
 def join_frames(left, right, on, how, lsuffix, rsuffix):
@@ -62,7 +61,7 @@ def join_frames(left, right, on, how, lsuffix, rsuffix):
     lsuffix, rsuffix : str
 
     """
-    assert how == 'left'
+    assert how == "left"
 
     def fix_left(df):
         newdf = cudf.DataFrame()
@@ -78,15 +77,10 @@ def join_frames(left, right, on, how, lsuffix, rsuffix):
     def nullcolumn(nelem, dtype):
         data = np.zeros(nelem, dtype=dtype)
         mask_size = cudf.utils.utils.calc_chunk_size(
-            data.size,
-            cudf.utils.utils.mask_bitsize,
-            )
+            data.size, cudf.utils.utils.mask_bitsize
+        )
         mask = np.zeros(mask_size, dtype=cudf.utils.utils.mask_dtype)
-        sr = cudf.Series.from_masked_array(
-            data=data,
-            mask=mask,
-            null_count=data.size,
-            )
+        sr = cudf.Series.from_masked_array(data=data, mask=mask, null_count=data.size)
         return sr
 
     def make_empty():
@@ -120,8 +114,9 @@ def join_frames(left, right, on, how, lsuffix, rsuffix):
     same_names = set(left_val_names) & set(right_val_names)
     fix_name = partial(_fix_name, same_names=same_names)
     if same_names and not (lsuffix or rsuffix):
-        raise ValueError('there are overlapping columns but '
-                         'lsuffix and rsuffix are not defined')
+        raise ValueError(
+            "there are overlapping columns but " "lsuffix and rsuffix are not defined"
+        )
 
     dtypes = {k: left[k].dtype for k in left.columns}
     dtypes.update({k: right[k].dtype for k in right.columns})
@@ -147,13 +142,12 @@ def join_frames(left, right, on, how, lsuffix, rsuffix):
     right_cats = [concat(*it) for it in right_subgroups]
 
     # Combine
-    merged = [delayed(merge)(left_cats[i], right_cats[i])
-              for i in range(nparts)]
+    merged = [delayed(merge)(left_cats[i], right_cats[i]) for i in range(nparts)]
 
-    return core.from_delayed(merged, prefix='join_result', meta=empty_frame)
+    return core.from_delayed(merged, prefix="join_result", meta=empty_frame)
 
 
 def _fix_name(k, suffix, same_names):
     if k not in same_names:
-        suffix = ''
+        suffix = ""
     return k + suffix

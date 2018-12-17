@@ -35,12 +35,14 @@ class Accessor(object):
     * _validate()
 
     """
+
     _not_implemented = frozenset([])
 
     def __init__(self, series):
         from .core import Series
+
         if not isinstance(series, Series):
-            raise ValueError('Accessor cannot be initialized')
+            raise ValueError("Accessor cannot be initialized")
         self._series = series
         self._validate(series)
 
@@ -61,20 +63,26 @@ class Accessor(object):
         return out
 
     def _property_map(self, attr):
-        meta = self._delegate_property(self._series._meta,
-                                       self._accessor_name, attr)
-        token = '%s-%s' % (self._accessor_name, attr)
-        return self._series.map_partitions(self._delegate_property,
-                                           self._accessor_name, attr,
-                                           token=token, meta=meta)
+        meta = self._delegate_property(self._series._meta, self._accessor_name, attr)
+        token = "%s-%s" % (self._accessor_name, attr)
+        return self._series.map_partitions(
+            self._delegate_property, self._accessor_name, attr, token=token, meta=meta
+        )
 
     def _function_map(self, attr, *args, **kwargs):
-        meta = self._delegate_method(self._series._meta_nonempty,
-                                     self._accessor_name, attr, args, kwargs)
-        token = '%s-%s' % (self._accessor_name, attr)
-        return self._series.map_partitions(self._delegate_method,
-                                           self._accessor_name, attr, args,
-                                           kwargs, meta=meta, token=token)
+        meta = self._delegate_method(
+            self._series._meta_nonempty, self._accessor_name, attr, args, kwargs
+        )
+        token = "%s-%s" % (self._accessor_name, attr)
+        return self._series.map_partitions(
+            self._delegate_method,
+            self._accessor_name,
+            attr,
+            args,
+            kwargs,
+            meta=meta,
+            token=token,
+        )
 
     @property
     def _delegates(self):
@@ -94,6 +102,7 @@ class Accessor(object):
                 return partial(self._function_map, key)
         else:
             raise AttributeError(key)
+
 
 # Adapted from
 # https://github.com/pandas-dev/pandas/blob/master/pandas/core/accessor.py
@@ -127,12 +136,13 @@ class DatetimeAccessor(Accessor):
     """
 
     _accessor = DatetimeProperties
-    _accessor_name = 'dt'
+    _accessor_name = "dt"
 
     def _validate(self, series):
         if not isinstance(series._meta._column, cudf.dataframe.DatetimeColumn):
-            raise AttributeError("Can only use .dt accessor with datetimelike "
-                                 "values")
+            raise AttributeError(
+                "Can only use .dt accessor with datetimelike " "values"
+            )
 
 
 class CategoricalAccessor(Accessor):
@@ -141,11 +151,11 @@ class CategoricalAccessor(Accessor):
     """
 
     _accessor = GdfCategoricalAccessor
-    _accessor_name = 'cat'
+    _accessor_name = "cat"
     ordered = True
 
     def _validate(self, series):
-        if not isinstance(series._meta._column,
-                          cudf.dataframe.categorical.CategoricalColumn):
-            raise AttributeError(
-                "Can only use .cat accessor with categorical values")
+        if not isinstance(
+            series._meta._column, cudf.dataframe.categorical.CategoricalColumn
+        ):
+            raise AttributeError("Can only use .cat accessor with categorical values")

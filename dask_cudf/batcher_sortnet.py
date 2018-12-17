@@ -84,16 +84,15 @@ def _compare_frame(a, b, max_part_size, by):
 
 
 def _compare_and_swap_frame(parts, a, b, max_part_size, by):
-    compared = delayed(_compare_frame)(parts[a], parts[b],
-                                       max_part_size, by=by)
+    compared = delayed(_compare_frame)(parts[a], parts[b], max_part_size, by=by)
     parts[a] = compared[0]
     parts[b] = compared[1]
 
 
 def _cleanup(df):
-    if '__dask_cudf__valid' in df.columns:
-        out = df.query('__dask_cudf__valid')
-        del out['__dask_cudf__valid']
+    if "__dask_cudf__valid" in df.columns:
+        out = df.query("__dask_cudf__valid")
+        del out["__dask_cudf__valid"]
     else:
         out = df
     return out
@@ -129,8 +128,9 @@ def sort_delayed_frame(parts, by):
     else:
         parts = [delayed(lambda x: x.sort_values(by=by))(parts[0])]
     # Count number of non-empty partitions
-    valid_ct = delayed(sum)(list(map(delayed(lambda x: int(x is not None)),
-                                     parts[:valid])))
+    valid_ct = delayed(sum)(
+        list(map(delayed(lambda x: int(x is not None)), parts[:valid]))
+    )
     valid = compute(valid_ct)[0]
     validparts = parts[:valid]
     return validparts

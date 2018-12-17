@@ -14,8 +14,8 @@ from dask.delayed import delayed
 @delayed
 def load_data(nelem, ident):
     df = gd.DataFrame()
-    df['x'] = np.arange(nelem)
-    df['ident'] = np.asarray([ident] * nelem)
+    df["x"] = np.arange(nelem)
+    df["ident"] = np.asarray([ident] * nelem)
     return df
 
 
@@ -35,8 +35,7 @@ def test_dataframe_from_delayed():
 
 
 def test_series_from_delayed():
-    delays = [get_combined_column(load_data(10 * i, i))
-              for i in range(1, 3)]
+    delays = [get_combined_column(load_data(10 * i, i)) for i in range(1, 3)]
     out = dgd.from_delayed(delays)
     res = out.compute()
     assert isinstance(res, gd.Series)
@@ -49,8 +48,8 @@ def test_dataframe_to_delayed():
     nelem = 100
 
     df = gd.DataFrame()
-    df['x'] = np.arange(nelem)
-    df['y'] = np.random.randint(nelem, size=nelem)
+    df["x"] = np.arange(nelem)
+    df["y"] = np.random.randint(nelem, size=nelem)
 
     ddf = dgd.from_cudf(df, npartitions=5)
 
@@ -108,8 +107,8 @@ def test_mixing_series_frame_error():
     nelem = 20
 
     df = gd.DataFrame()
-    df['x'] = np.arange(nelem)
-    df['y'] = np.random.randint(nelem, size=nelem)
+    df["x"] = np.arange(nelem)
+    df["y"] = np.random.randint(nelem, size=nelem)
 
     ddf = dgd.from_cudf(df, npartitions=5)
 
@@ -128,11 +127,11 @@ def test_frame_extra_columns_error():
     nelem = 20
 
     df = gd.DataFrame()
-    df['x'] = np.arange(nelem)
-    df['y'] = np.random.randint(nelem, size=nelem)
+    df["x"] = np.arange(nelem)
+    df["y"] = np.random.randint(nelem, size=nelem)
     ddf1 = dgd.from_cudf(df, npartitions=5)
 
-    df['z'] = np.arange(nelem)
+    df["z"] = np.arange(nelem)
     ddf2 = dgd.from_cudf(df, npartitions=5)
 
     combined = dgd.from_delayed(ddf1.to_delayed() + ddf2.to_delayed())
@@ -148,12 +147,12 @@ def test_frame_dtype_error():
     nelem = 20
 
     df1 = gd.DataFrame()
-    df1['bad'] = np.arange(nelem)
-    df1['bad'] = np.arange(nelem, dtype=np.float64)
+    df1["bad"] = np.arange(nelem)
+    df1["bad"] = np.arange(nelem, dtype=np.float64)
 
     df2 = gd.DataFrame()
-    df2['bad'] = np.arange(nelem)
-    df2['bad'] = np.arange(nelem, dtype=np.float32)
+    df2["bad"] = np.arange(nelem)
+    df2["bad"] = np.arange(nelem, dtype=np.float32)
 
     ddf1 = dgd.from_cudf(df1, npartitions=5)
     ddf2 = dgd.from_cudf(df2, npartitions=5)
