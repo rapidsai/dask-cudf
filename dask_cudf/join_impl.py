@@ -1,9 +1,9 @@
 from functools import partial
 
 import numpy as np
-import cudf
 from dask import delayed
 
+import cudf
 from dask_cudf import core
 
 

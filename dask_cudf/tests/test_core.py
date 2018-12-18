@@ -1,13 +1,12 @@
+import dask
+import dask.dataframe as dd
 import numpy as np
 import pandas as pd
+import pytest
 from pandas.util.testing import assert_frame_equal
 
-import pytest
-
-import dask
 import cudf as gd
 import dask_cudf as dgd
-import dask.dataframe as dd
 
 
 def test_from_cudf():

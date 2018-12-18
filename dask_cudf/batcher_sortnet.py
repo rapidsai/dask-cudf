@@ -4,7 +4,8 @@ Adapted from https://en.wikipedia.org/wiki/Batcher_odd%E2%80%93even_mergesort
 """
 import math
 
-from dask import delayed, compute
+from dask import compute, delayed
+
 import cudf as gd
 
 

@@ -1,10 +1,9 @@
-import pytest
-
+import dask
 import numpy as np
 import pandas as pd
+import pytest
 
 import cudf as gd
-import dask
 import dask_cudf as dgd
 
 

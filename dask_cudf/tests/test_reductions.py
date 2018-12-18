@@ -1,10 +1,10 @@
 import numpy as np
 import pandas as pd
 import pytest
+from dask.dataframe.utils import assert_eq
 
 import cudf as gd
 import dask_cudf as dgd
-from dask.dataframe.utils import assert_eq
 
 
 def _make_random_frame(nelem, npartitions=2):

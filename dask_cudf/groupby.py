@@ -1,8 +1,7 @@
 import numpy as np
-
 from dask.delayed import delayed
-import cudf as gd
 
+import cudf as gd
 from dask_cudf import from_delayed
 
 

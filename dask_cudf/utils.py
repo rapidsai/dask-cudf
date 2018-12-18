@@ -1,7 +1,8 @@
-import pandas as pd
-import cudf
 import dask.dataframe as dd
+import pandas as pd
 from dask.utils import asciitable
+
+import cudf
 
 
 def make_meta(x):

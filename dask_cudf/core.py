@@ -1,34 +1,31 @@
 # Copyright (c) 2018, NVIDIA CORPORATION.
 
-import operator
-from uuid import uuid4
-from math import ceil
 from collections import OrderedDict
+from math import ceil
+from uuid import uuid4
 
+import dask
+import dask.dataframe as dd
 import numpy as np
 import pandas as pd
-import cudf
-from libgdf_cffi import libgdf
-from toolz import merge, partition_all
-
-import dask.dataframe as dd
-import dask
-from dask.base import tokenize, normalize_token, DaskMethodsMixin
+from dask import compute
+from dask.base import normalize_token, tokenize
+from dask.compatibility import apply
 from dask.context import _globals
 from dask.core import flatten
-from dask.compatibility import apply
-from dask.optimization import cull, fuse
-from dask.threaded import get as threaded_get
-from dask.utils import funcname, M, OperatorMethodMixin
-from dask.dataframe.utils import raise_on_meta_error
-from dask.dataframe.core import Scalar
 from dask.dataframe import from_delayed
+from dask.dataframe.core import Scalar
+from dask.dataframe.utils import raise_on_meta_error
 from dask.delayed import delayed
-from dask import compute
+from dask.optimization import cull, fuse
+from dask.utils import M, OperatorMethodMixin, funcname
+from libgdf_cffi import libgdf
+from toolz import partition_all
 
-from dask_cudf.utils import make_meta, check_meta
+import cudf
 from dask_cudf import batcher_sortnet, join_impl
-from dask_cudf.accessor import DatetimeAccessor, CategoricalAccessor, CachedAccessor
+from dask_cudf.accessor import CachedAccessor, CategoricalAccessor, DatetimeAccessor
+from dask_cudf.utils import make_meta
 
 
 def optimize(dsk, keys, **kwargs):
