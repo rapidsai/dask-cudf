@@ -8,7 +8,7 @@ Setup from source repo:
 
 1.  Install dependencies into a new conda environment
 
-        conda install -n dask-cudf \
+        conda create -n dask-cudf \
            -c rapidsai -c numba -c conda-forge -c defaults \
            pygdf dask distributed cudatoolkit
 
@@ -37,4 +37,16 @@ Setup from source repo:
 
 3. Or, run individual tests:
 
-        pytest dask_cudf/tests/test_file.py
+        py.test dask_cudf/tests/test_file.py
+
+## Style
+
+For style we use `black`, `isort`, and `flake8`.  These are available as
+pre-commit hooks that will run every time you are about to commit code.
+
+From the root directory of this project run the following:
+
+```
+pip install pre-commit
+pre-commit install
+```
