@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 from pandas.util.testing import assert_frame_equal
 
-import cudf as gd
+import cudf
 import dask_cudf as dgd
 
 
@@ -16,7 +16,7 @@ def test_from_cudf():
         {"x": np.random.randint(0, 5, size=10000), "y": np.random.normal(size=10000)}
     )
 
-    gdf = gd.DataFrame.from_pandas(df)
+    gdf = cudf.DataFrame.from_pandas(df)
 
     # Test simple around to/from dask
     ingested = dgd.from_cudf(gdf, npartitions=2)
@@ -46,7 +46,7 @@ def test_concat():
         {"x": np.random.randint(0, 5, size=n), "y": np.random.normal(size=n)}
     )
 
-    gdf = gd.DataFrame.from_pandas(df)
+    gdf = cudf.DataFrame.from_pandas(df)
     frags = _fragmented_gdf(gdf, nsplit=13)
 
     # Combine with concat
@@ -62,7 +62,7 @@ def test_append():
         {"x": np.random.randint(0, 5, size=n), "y": np.random.normal(size=n)}
     )
 
-    gdf = gd.DataFrame.from_pandas(df)
+    gdf = cudf.DataFrame.from_pandas(df)
     frags = _fragmented_gdf(gdf, nsplit=13)
 
     # Combine with .append
@@ -84,7 +84,7 @@ def test_series_concat():
         {"x": np.random.randint(0, 5, size=n), "y": np.random.normal(size=n)}
     )
 
-    gdf = gd.DataFrame.from_pandas(df)
+    gdf = cudf.DataFrame.from_pandas(df)
     frags = _fragmented_gdf(gdf, nsplit=13)
 
     frags = [df.x for df in frags]
@@ -102,7 +102,7 @@ def test_series_append():
         {"x": np.random.randint(0, 5, size=n), "y": np.random.normal(size=n)}
     )
 
-    gdf = gd.DataFrame.from_pandas(df)
+    gdf = cudf.DataFrame.from_pandas(df)
     frags = _fragmented_gdf(gdf, nsplit=13)
 
     frags = [df.x for df in frags]
@@ -122,7 +122,7 @@ def test_query():
     df = pd.DataFrame(
         {"x": np.random.randint(0, 5, size=10), "y": np.random.normal(size=10)}
     )
-    gdf = gd.DataFrame.from_pandas(df)
+    gdf = cudf.DataFrame.from_pandas(df)
     expr = "x > 2"
 
     assert_frame_equal(gdf.query(expr).to_pandas(), df.query(expr))
@@ -140,7 +140,7 @@ def test_head():
     df = pd.DataFrame(
         {"x": np.random.randint(0, 5, size=100), "y": np.random.normal(size=100)}
     )
-    gdf = gd.DataFrame.from_pandas(df)
+    gdf = cudf.DataFrame.from_pandas(df)
     dgf = dgd.from_cudf(gdf, npartitions=2)
 
     assert_frame_equal(dgf.head().to_pandas(), df.head())
@@ -208,7 +208,7 @@ def test_set_index_2(nelem):
         )
         expect = df.set_index("x").sort_index()
 
-        dgf = dgd.from_cudf(gd.DataFrame.from_pandas(df), npartitions=4)
+        dgf = dgd.from_cudf(cudf.DataFrame.from_pandas(df), npartitions=4)
         res = dgf.set_index("x")  # sort by default
         got = res.compute().to_pandas()
 
@@ -227,7 +227,7 @@ def test_set_index_w_series():
         )
         expect = df.set_index(df.x).sort_index()
 
-        dgf = dgd.from_cudf(gd.DataFrame.from_pandas(df), npartitions=4)
+        dgf = dgd.from_cudf(cudf.DataFrame.from_pandas(df), npartitions=4)
         res = dgf.set_index(dgf.x)  # sort by default
         got = res.compute().to_pandas()
 
@@ -241,9 +241,9 @@ def test_assign():
         {"x": np.random.randint(0, 5, size=20), "y": np.random.normal(size=20)}
     )
 
-    dgf = dgd.from_cudf(gd.DataFrame.from_pandas(df), npartitions=2)
+    dgf = dgd.from_cudf(cudf.DataFrame.from_pandas(df), npartitions=2)
     pdcol = pd.Series(np.arange(20) + 1000)
-    newcol = dgd.from_cudf(gd.Series(pdcol), npartitions=dgf.npartitions)
+    newcol = dgd.from_cudf(cudf.Series(pdcol), npartitions=dgf.npartitions)
     out = dgf.assign(z=newcol)
 
     got = out.compute().to_pandas()
@@ -258,7 +258,7 @@ def test_setitem_scalar_integer(data_type):
     df = pd.DataFrame(
         {"x": np.random.randint(0, 5, size=20), "y": np.random.normal(size=20)}
     )
-    dgf = dgd.from_cudf(gd.DataFrame.from_pandas(df), npartitions=2)
+    dgf = dgd.from_cudf(cudf.DataFrame.from_pandas(df), npartitions=2)
 
     df["z"] = scalar
     dgf["z"] = scalar
@@ -274,7 +274,7 @@ def test_setitem_scalar_float(data_type):
     df = pd.DataFrame(
         {"x": np.random.randint(0, 5, size=20), "y": np.random.normal(size=20)}
     )
-    dgf = dgd.from_cudf(gd.DataFrame.from_pandas(df), npartitions=2)
+    dgf = dgd.from_cudf(cudf.DataFrame.from_pandas(df), npartitions=2)
 
     df["z"] = scalar
     dgf["z"] = scalar
@@ -289,7 +289,7 @@ def test_setitem_scalar_datetime():
     df = pd.DataFrame(
         {"x": np.random.randint(0, 5, size=20), "y": np.random.normal(size=20)}
     )
-    dgf = dgd.from_cudf(gd.DataFrame.from_pandas(df), npartitions=2)
+    dgf = dgd.from_cudf(cudf.DataFrame.from_pandas(df), npartitions=2)
 
     df["z"] = scalar
     dgf["z"] = scalar
