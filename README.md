@@ -10,13 +10,13 @@ Setup from source repo:
 
         conda create -n dask-cudf \
            -c rapidsai -c numba -c conda-forge -c defaults \
-           pygdf dask distributed cudatoolkit
+           cudf dask cudatoolkit
 
 2.  Activate conda environment:
 
         source activate dask-cudf
 
-3.  Clone dask_gdf repo:
+3.  Clone `dask_gdf` repo:
 
         git clone https://github.com/rapidsai/dask-cudf
 
