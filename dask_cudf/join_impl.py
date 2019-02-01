@@ -23,17 +23,6 @@ def get_subgroup(groups, i):
     return out
 
 
-@delayed
-def concat(*frames):
-    frames = list(filter(len, frames))
-    if len(frames) > 1:
-        return cudf.concat(frames)
-    elif len(frames) == 1:
-        return frames[0]
-    else:
-        return None
-
-
 def group_frame(frame_partitions, num_new_parts, key_columns):
     """Group frame to prepare for the join
     """
@@ -83,15 +72,9 @@ def join_frames(left, right, on, how, lsuffix, rsuffix):
         sr = cudf.Series.from_masked_array(data=data, mask=mask, null_count=data.size)
         return sr
 
-    def make_empty():
-        df = cudf.DataFrame()
-        for k in on:
-            df[k] = np.asarray([], dtype=dtypes[k])
-        for k in left_val_names:
-            df[fix_name(k, lsuffix)] = np.asarray([], dtype=dtypes[k])
-        for k in right_val_names:
-            df[fix_name(k, rsuffix)] = np.asarray([], dtype=dtypes[k])
-        return df
+    empty_frame = left._meta.merge(
+        right._meta, on=on, how=how, lsuffix=lsuffix, rsuffix=rsuffix
+    )
 
     def merge(left, right):
         if left is None and right is None:
@@ -107,7 +90,7 @@ def join_frames(left, right, on, how, lsuffix, rsuffix):
             #        right frames
             return fix_left(left)
         else:
-            return left.merge(right, on=on, how=how)
+            return left.merge(right, on=on, how=how, lsuffix=lsuffix, rsuffix=rsuffix)
 
     left_val_names = [k for k in left.columns if k not in on]
     right_val_names = [k for k in right.columns if k not in on]
@@ -121,7 +104,6 @@ def join_frames(left, right, on, how, lsuffix, rsuffix):
     dtypes = {k: left[k].dtype for k in left.columns}
     dtypes.update({k: right[k].dtype for k in right.columns})
 
-    empty_frame = make_empty()
     left_parts = left.to_delayed()
     right_parts = right.to_delayed()
 
@@ -138,8 +120,8 @@ def join_frames(left, right, on, how, lsuffix, rsuffix):
     assert len(left_subgroups) == len(right_subgroups)
 
     # Concat
-    left_cats = [concat(*it) for it in left_subgroups]
-    right_cats = [concat(*it) for it in right_subgroups]
+    left_cats = [delayed(cudf.concat, pure=True)(it) for it in left_subgroups]
+    right_cats = [delayed(cudf.concat, pure=True)(it) for it in right_subgroups]
 
     # Combine
     merged = [delayed(merge)(left_cats[i], right_cats[i]) for i in range(nparts)]

@@ -1,16 +1,15 @@
 from functools import partial
 
 import numpy as np
-import pandas as pd
 import pytest
 
 import cudf as gd
 import dask_cudf as dgd
+import dask.dataframe as dd
 
 param_nrows = [5, 10, 50, 100]
 
 
-@pytest.mark.skip(reason="Join implementation not updated")
 @pytest.mark.parametrize("left_nrows", param_nrows)
 @pytest.mark.parametrize("right_nrows", param_nrows)
 @pytest.mark.parametrize("left_nkeys", [4, 5])
@@ -65,7 +64,6 @@ def test_join_inner(left_nrows, right_nrows, left_nkeys, right_nkeys):
     assert got_rows == expect_rows
 
 
-@pytest.mark.skip(reason="Join implementation not updated")
 @pytest.mark.parametrize("left_nrows", param_nrows)
 @pytest.mark.parametrize("right_nrows", param_nrows)
 @pytest.mark.parametrize("left_nkeys", [4, 5])
@@ -131,7 +129,6 @@ def test_join_left(left_nrows, right_nrows, left_nkeys, right_nkeys, how):
 @pytest.mark.parametrize("left_nkeys", [4, 5])
 @pytest.mark.parametrize("right_nkeys", [4, 5])
 def test_merge_left(left_nrows, right_nrows, left_nkeys, right_nkeys, how="left"):
-    print(left_nrows, right_nrows, left_nkeys, right_nkeys)
     chunksize = 3
 
     np.random.seed(0)
@@ -152,30 +149,22 @@ def test_merge_left(left_nrows, right_nrows, left_nkeys, right_nkeys, how="left"
         }.items()
     )
 
-    print(left.to_pandas())
-    print(right.to_pandas())
-
     expect = left.merge(right, on=("x", "y"), how=how)
-    expect = (
-        expect.to_pandas().sort_values(["x", "y", "a_x", "a_y"]).reset_index(drop=True)
-    )
 
-    print("Expect".center(80, "="))
-    print(expect)
+    def normalize(df):
+        return (
+            df.to_pandas().sort_values(["x", "y", "a_x", "a_y"]).reset_index(drop=True)
+        )
 
     # dask_cudf
     left = dgd.from_cudf(left, chunksize=chunksize)
     right = dgd.from_cudf(right, chunksize=chunksize)
 
-    joined = left.merge(right, on=("x", "y"), how=how)
+    result = left.merge(right, on=("x", "y"), how=how).compute(
+        scheduler="single-threaded"
+    )
 
-    print("Got".center(80, "="))
-    got = joined.compute().to_pandas()
-
-    got = got.sort_values(["x", "y", "a_x", "a_y"]).reset_index(drop=True)
-    print(got)
-
-    pd.util.testing.assert_frame_equal(expect, got)
+    dd.assert_eq(normalize(expect), normalize(result))
 
 
 @pytest.mark.parametrize("left_nrows", [2, 5])
@@ -183,7 +172,6 @@ def test_merge_left(left_nrows, right_nrows, left_nkeys, right_nkeys, how="left"
 @pytest.mark.parametrize("left_nkeys", [4])
 @pytest.mark.parametrize("right_nkeys", [4])
 def test_merge_1col_left(left_nrows, right_nrows, left_nkeys, right_nkeys, how="left"):
-    print(left_nrows, right_nrows, left_nkeys, right_nkeys)
     chunksize = 3
 
     np.random.seed(0)
@@ -202,14 +190,8 @@ def test_merge_1col_left(left_nrows, right_nrows, left_nkeys, right_nkeys, how="
         }.items()
     )
 
-    print(left.to_pandas())
-    print(right.to_pandas())
-
     expect = left.merge(right, on=["x"], how=how)
     expect = expect.to_pandas().sort_values(["x", "a_x", "a_y"]).reset_index(drop=True)
-
-    print("Expect".center(80, "="))
-    print(expect)
 
     # dask_cudf
     left = dgd.from_cudf(left, chunksize=chunksize)
@@ -217,10 +199,8 @@ def test_merge_1col_left(left_nrows, right_nrows, left_nkeys, right_nkeys, how="
 
     joined = left.merge(right, on=["x"], how=how)
 
-    print("Got".center(80, "="))
     got = joined.compute().to_pandas()
 
     got = got.sort_values(["x", "a_x", "a_y"]).reset_index(drop=True)
-    print(got)
 
-    pd.util.testing.assert_frame_equal(expect, got)
+    dd.assert_eq(expect, got)
