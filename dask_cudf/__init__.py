@@ -7,6 +7,7 @@ from .core import (
     from_delayed,
 )
 from .io import read_csv
+from . import backends
 
 from cudf._version import get_versions
 
