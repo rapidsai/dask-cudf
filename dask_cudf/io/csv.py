@@ -28,7 +28,6 @@ def read_csv(path, chunksize="128 MiB", **kwargs):
                 start,
                 chunksize,
             )  # specify which chunk of the file we care about
-            kwargs2["dtype"] = meta.dtypes.values
             if start != 0:
                 kwargs2["names"] = meta.columns  # no header in the middle of the file
                 kwargs2["header"] = None
