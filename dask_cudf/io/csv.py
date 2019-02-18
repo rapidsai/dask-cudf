@@ -12,13 +12,14 @@ def read_csv(path, chunksize="128 MiB", **kwargs):
     if isinstance(chunksize, str):
         chunksize = parse_bytes(chunksize)
     filenames = sorted(glob(str(path)))  # TODO: lots of complexity
-    name = "read-csv-" + tokenize(path, **kwargs)  # TODO: get last modified time
+    name = "read-csv-" + tokenize(
+        path, tokenize, **kwargs
+    )  # TODO: get last modified time
 
     meta = cudf.read_csv(filenames[0], **kwargs)
 
     dsk = {}
     i = 0
-    name = f"read-csv-{tokenize(path, chunksize, **kwargs)}"
     for fn in filenames:
         size = os.path.getsize(fn)
         for start in range(0, size, chunksize):
