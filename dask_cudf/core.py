@@ -244,11 +244,6 @@ class DataFrame(_Frame, dd.core.DataFrame):
         callenv = {"locals": {}, "globals": {}}
         return self.map_partitions(query, expr, callenv, meta=self._meta)
 
-    def groupby(self, by, method="hash"):
-        from .groupby import Groupby
-
-        return Groupby(df=self, by=by, method=method)
-
     def merge(self, other, on=None, how="left", lsuffix="_x", rsuffix="_y"):
         """Merging two dataframes on the column(s) indicated in *on*.
         """
