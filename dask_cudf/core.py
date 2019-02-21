@@ -496,7 +496,7 @@ class DataFrame(_Frame, dd.core.DataFrame):
         out = shuffled.map_partitions(lambda df: df.set_index(indexname))
         return out
 
-    def reset_index(self, force=False):
+    def reset_index(self, force=False, drop=False):
         """Reset index to range based
         """
         if force:
@@ -513,13 +513,9 @@ class DataFrame(_Frame, dd.core.DataFrame):
                 )
 
             outdfs = [fix_index(df, startpos) for df, startpos in zip(dfs, prefixes)]
-            return from_delayed(outdfs, meta=self._meta.reset_index())
+            return from_delayed(outdfs, meta=self._meta.reset_index(drop=True))
         else:
-
-            def reset_index(df):
-                return df.reset_index()
-
-            return self.map_partitions(reset_index, meta=reset_index(self._meta))
+            return self.map_partitions(M.reset_index, drop=drop)
 
     def sort_values(self, by, ignore_index=False):
         """Sort by the given column

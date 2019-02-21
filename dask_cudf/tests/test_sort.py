@@ -3,18 +3,18 @@ import numpy as np
 import pandas as pd
 import pytest
 
-import cudf as gd
-import dask_cudf as dgd
+import cudf
+import dask.dataframe as dd
 
 
 @pytest.mark.parametrize("by", ["a", "b"])
 @pytest.mark.parametrize("nelem", [10, 100, 1000])
 @pytest.mark.parametrize("nparts", [1, 2, 5, 10])
 def test_sort_values(nelem, nparts, by):
-    df = gd.DataFrame()
+    df = cudf.DataFrame()
     df["a"] = np.ascontiguousarray(np.arange(nelem)[::-1])
     df["b"] = np.arange(100, nelem + 100)
-    ddf = dgd.from_cudf(df, npartitions=nparts)
+    ddf = dd.from_pandas(df, npartitions=nparts)
 
     with dask.config.set(scheduler="single-threaded"):
         got = ddf.sort_values(by=by).compute().to_pandas()
@@ -27,9 +27,9 @@ def test_sort_values_binned():
     nelem = 100
     nparts = 5
     by = "a"
-    df = gd.DataFrame()
+    df = cudf.DataFrame()
     df["a"] = np.random.randint(1, 5, nelem)
-    ddf = dgd.from_cudf(df, npartitions=nparts)
+    ddf = dd.from_pandas(df, npartitions=nparts)
 
     parts = ddf.sort_values_binned(by=by).to_delayed()
     part_uniques = []
@@ -43,3 +43,10 @@ def test_sort_values_binned():
             assert not (
                 part_uniques[i] & part_uniques[j]
             ), "should have empty intersection"
+
+
+def test_sort_binned_meta():
+    df = cudf.DataFrame([("a", [0, 1, 2, 3, 4]), ("b", [5, 6, 7, 7, 8])])
+    ddf = dd.from_pandas(df, npartitions=2).persist()
+
+    ddf.sort_values_binned(by="b")
