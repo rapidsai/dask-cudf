@@ -1,10 +1,7 @@
-from functools import partial
-
-import numpy as np
 from dask import delayed
+import dask.dataframe as dd
 
 import cudf
-from dask_cudf import core
 
 
 @delayed
@@ -48,29 +45,7 @@ def join_frames(left, right, on, how, lsuffix, rsuffix):
     how : str
         Join method
     lsuffix, rsuffix : str
-
     """
-
-    def fix_left(df):
-        newdf = cudf.DataFrame()
-        df = df.reset_index()
-        for k in on:
-            newdf[k] = df[k]
-        for k in left_val_names:
-            newdf[fix_name(k, lsuffix)] = df[k]
-        for k in right_val_names:
-            newdf[fix_name(k, rsuffix)] = nullcolumn(len(df), dtypes[k])
-        return newdf
-
-    def nullcolumn(nelem, dtype):
-        data = np.zeros(nelem, dtype=dtype)
-        mask_size = cudf.utils.utils.calc_chunk_size(
-            data.size, cudf.utils.utils.mask_bitsize
-        )
-        mask = np.zeros(mask_size, dtype=cudf.utils.utils.mask_dtype)
-        sr = cudf.Series.from_masked_array(data=data, mask=mask, null_count=data.size)
-        return sr
-
     empty_frame = left._meta.merge(
         right._meta, on=on, how=how, lsuffix=lsuffix, rsuffix=rsuffix
     )
@@ -81,7 +56,6 @@ def join_frames(left, right, on, how, lsuffix, rsuffix):
     left_val_names = [k for k in left.columns if k not in on]
     right_val_names = [k for k in right.columns if k not in on]
     same_names = set(left_val_names) & set(right_val_names)
-    fix_name = partial(_fix_name, same_names=same_names)
     if same_names and not (lsuffix or rsuffix):
         raise ValueError(
             "there are overlapping columns but " "lsuffix and rsuffix are not defined"
@@ -110,12 +84,8 @@ def join_frames(left, right, on, how, lsuffix, rsuffix):
     right_cats = [delayed(cudf.concat, pure=True)(it) for it in right_subgroups]
 
     # Combine
-    merged = [delayed(merge)(left_cats[i], right_cats[i]) for i in range(nparts)]
+    merged = [
+        delayed(merge, pure=True)(left_cats[i], right_cats[i]) for i in range(nparts)
+    ]
 
-    return core.from_delayed(merged, prefix="join_result", meta=empty_frame)
-
-
-def _fix_name(k, suffix, same_names):
-    if k not in same_names:
-        suffix = ""
-    return k + suffix
+    return dd.from_delayed(merged, prefix="join_result", meta=empty_frame)
