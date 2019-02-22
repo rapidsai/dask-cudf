@@ -1,5 +1,6 @@
 import os
 from glob import glob
+from warnings import warn
 
 import cudf
 from dask.base import tokenize
@@ -16,12 +17,20 @@ def read_csv(path, chunksize="128 MiB", **kwargs):
         path, tokenize, **kwargs
     )  # TODO: get last modified time
 
+    compression = kwargs.pop('compression', False)
     meta = cudf.read_csv(filenames[0], **kwargs)
 
     dsk = {}
     i = 0
     for fn in filenames:
         size = os.path.getsize(fn)
+        if chunksize and compression:
+            warn("Warning %s compression does not support breaking apart files\n"
+                "Please ensure that each individual file can fit in memory and\n"
+                "use the keyword ``blocksize=None to remove this message``\n"
+                "Setting ``chunksize=(size of file)``" % compression)
+        chunksize = size
+
         for start in range(0, size, chunksize):
             kwargs2 = kwargs.copy()
             kwargs2["byte_range"] = (
