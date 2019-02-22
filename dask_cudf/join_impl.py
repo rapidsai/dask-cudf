@@ -50,7 +50,6 @@ def join_frames(left, right, on, how, lsuffix, rsuffix):
     lsuffix, rsuffix : str
 
     """
-    assert how == "left"
 
     def fix_left(df):
         newdf = cudf.DataFrame()
@@ -77,20 +76,7 @@ def join_frames(left, right, on, how, lsuffix, rsuffix):
     )
 
     def merge(left, right):
-        if left is None and right is None:
-            # FIXME: this should go inside cudf so it can merge two empty
-            #        frames
-            return empty_frame
-        elif left is None:
-            # FIXME: this should go inside cudf so it can merge empty frames
-            #        left frames
-            return empty_frame
-        elif right is None:
-            # FIXME: this should go inside cudf so it can merge empty frames
-            #        right frames
-            return fix_left(left)
-        else:
-            return left.merge(right, on=on, how=how, lsuffix=lsuffix, rsuffix=rsuffix)
+        return left.merge(right, on=on, how=how, lsuffix=lsuffix, rsuffix=rsuffix)
 
     left_val_names = [k for k in left.columns if k not in on]
     right_val_names = [k for k in right.columns if k not in on]

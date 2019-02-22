@@ -247,7 +247,6 @@ class DataFrame(_Frame, dd.core.DataFrame):
     def merge(self, other, on=None, how="left", lsuffix="_x", rsuffix="_y"):
         """Merging two dataframes on the column(s) indicated in *on*.
         """
-        assert how == "left", "left join is impelemented"
         if on is None:
             return self.join(other, how=how, lsuffix=lsuffix, rsuffix=rsuffix)
         else:
@@ -314,10 +313,10 @@ class DataFrame(_Frame, dd.core.DataFrame):
 
             for k, dtype in rhs_dtypes:
                 data = np.zeros(len(lhs), dtype=dtype)
-                mask_size = cudf.utils.calc_chunk_size(
-                    data.size, cudf.utils.mask_bitsize
+                mask_size = cudf.utils.utils.calc_chunk_size(
+                    data.size, cudf.utils.utils.mask_bitsize
                 )
-                mask = np.zeros(mask_size, dtype=cudf.utils.mask_dtype)
+                mask = np.zeros(mask_size, dtype=cudf.utils.utils.mask_dtype)
                 sr = cudf.Series.from_masked_array(
                     data=data, mask=mask, null_count=data.size
                 )
