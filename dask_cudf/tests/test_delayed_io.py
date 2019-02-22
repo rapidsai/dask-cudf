@@ -142,6 +142,7 @@ def test_frame_extra_columns_error():
     raises.match(r"z")
 
 
+@pytest.mark.xfail(reason="")
 def test_frame_dtype_error():
     nelem = 20
 
