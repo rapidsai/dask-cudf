@@ -8,7 +8,7 @@ import dask.dataframe as dd
 from dask.utils import parse_bytes
 
 
-def read_csv(path, chunksize="128 MiB", **kwargs):
+def read_csv(path, chunksize="256 MiB", **kwargs):
     if isinstance(chunksize, str):
         chunksize = parse_bytes(chunksize)
     filenames = sorted(glob(str(path)))  # TODO: lots of complexity
