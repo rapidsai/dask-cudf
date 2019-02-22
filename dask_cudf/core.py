@@ -1,8 +1,6 @@
 # Copyright (c) 2018, NVIDIA CORPORATION.
 
 from collections import OrderedDict
-from math import ceil
-from uuid import uuid4
 
 import dask
 import dask.dataframe as dd
@@ -676,79 +674,6 @@ def splits_divisions_sorted_cudf(df, chunksize):
     return splits, divisions
 
 
-def from_cudf(data, npartitions=None, chunksize=None, sort=True, name=None):
-    """Create a dask_cudf from a cudf object
-
-    Parameters
-    ----------
-    data : cudf.DataFrame or cudf.Series
-    npartitions : int, optional
-        The number of partitions of the index to create. Note that depending on
-        the size and index of the dataframe, the output may have fewer
-        partitions than requested.
-    chunksize : int, optional
-        The number of rows per index partition to use.
-    sort : bool
-        Sort input first to obtain cleanly divided partitions or don't sort and
-        don't get cleanly divided partitions
-    name : string, optional
-        An optional keyname for the dataframe. Defaults to a uuid.
-
-    Returns
-    -------
-    dask_cudf.DataFrame or dask_cudf.Series
-        A dask_cudf DataFrame/Series partitioned along the index
-    """
-    if not isinstance(data, (cudf.Series, cudf.DataFrame)):
-        raise TypeError("Input must be a cudf DataFrame or Series")
-
-    if (npartitions is None) == (chunksize is None):
-        raise ValueError(
-            "Exactly one of npartitions and chunksize must " "be specified."
-        )
-
-    nrows = len(data)
-
-    if chunksize is None:
-        chunksize = int(ceil(nrows / npartitions))
-
-    name = name or ("from_cudf-" + uuid4().hex)
-
-    if sort:
-        data = data.sort_index(ascending=True)
-        splits, divisions = splits_divisions_sorted_cudf(data, chunksize)
-    else:
-        splits = list(range(0, nrows, chunksize)) + [len(data)]
-        divisions = (None,) * len(splits)
-
-    dsk = {
-        (name, i): data[start:stop]
-        for i, (start, stop) in enumerate(zip(splits[:-1], splits[1:]))
-    }
-
-    return dd.core.new_dd_object(dsk, name, data, divisions)
-
-
-def _from_pandas(df):
-    return cudf.DataFrame.from_pandas(df)
-
-
-def from_dask_dataframe(df):
-    """Create a `dask_cudf.DataFrame` from a `dask.dataframe.DataFrame`
-
-    Parameters
-    ----------
-    df : dask.dataframe.DataFrame
-    """
-    bad_cols = df.select_dtypes(include=["O"])
-    if len(bad_cols.columns):
-        raise ValueError("Object dtypes aren't supported by cudf")
-
-    meta = _from_pandas(df._meta)
-    dummy = DataFrame(df.dask, df._name, meta, df.divisions)
-    return dummy.map_partitions(_from_pandas, meta=meta)
-
-
 def _extract_meta(x):
     """
     Extract internal cache data (``_meta``) from dask_cudf objects
@@ -924,3 +849,10 @@ def reduction(
             dsk.update(arg.dask)
 
     return dd.core.new_dd_object(dsk, b, meta, (None, None))
+
+
+from_cudf = dd.from_pandas
+
+
+def from_dask_dataframe(df):
+    return df.map_partitions(cudf.from_pandas)
