@@ -28,7 +28,7 @@ def read_csv(path, chunksize="256 MiB", **kwargs):
         warn(
             "Warning %s compression does not support breaking apart files\n"
             "Please ensure that each individual file can fit in memory and\n"
-            "use the keyword ``blocksize=None to remove this message``\n"
+            "use the keyword ``chunksize=None to remove this message``\n"
             "Setting ``chunksize=(size of file)``" % compression
         )
 
