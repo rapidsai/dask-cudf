@@ -76,7 +76,7 @@ def read_csv_with_compression(path, **kwargs):
         path to files (support for glob)
     """
     filenames = sorted(glob(str(path)))
-    name = "read-csv-w-compression-" + tokenize(
+    name = "read-csv-" + tokenize(
         path, tokenize, **kwargs)
 
     meta = cudf.read_csv(filenames[0], **kwargs)
