@@ -20,20 +20,23 @@ def read_csv(path, chunksize="256 MiB", **kwargs):
         path, tokenize, **kwargs
     )  # TODO: get last modified time
 
+    if chunksize is None:
+        return read_csv_with_compression(path, **kwargs)
+
     compression = kwargs.pop('compression', False)
     meta = cudf.read_csv(filenames[0], **kwargs)
     dsk = {}
     i = 0
     dtypes = meta.dtypes.values
+
+    if chunksize and compression:
+        warn("Warning %s compression does not support breaking apart files\n"
+            "Please ensure that each individual file can fit in memory and\n"
+            "use the keyword ``blocksize=None to remove this message``\n"
+            "Setting ``chunksize=(size of file)``" % compression)
+
     for fn in filenames:
         size = os.path.getsize(fn)
-        if chunksize and compression:
-            warn("Warning %s compression does not support breaking apart files\n"
-                "Please ensure that each individual file can fit in memory and\n"
-                "use the keyword ``blocksize=None to remove this message``\n"
-                "Setting ``chunksize=(size of file)``" % compression)
-        chunksize = size
-
         for start in range(0, size, chunksize):
             kwargs2 = kwargs.copy()
             kwargs2["byte_range"] = (
@@ -62,3 +65,28 @@ def _read_csv(fn, dtypes=None, **kwargs):
         cdf = cudf.from_pandas(df)
 
     return cdf
+
+
+def read_csv_with_compression(path, **kwargs):
+    """Read CSV with Compression (gzip/zip)
+
+    Parameters
+    ----------
+    path : str
+        path to files (support for glob)
+    """
+    filenames = sorted(glob(str(path)))
+    name = "read-csv-w-compression-" + tokenize(
+        path, tokenize, **kwargs)
+
+    meta = cudf.read_csv(filenames[0], **kwargs)
+
+    graph = {
+        (name, i): (apply, cudf.read_csv, [fn], kwargs)
+        for i, fn in enumerate(filenames)
+    }
+
+    divisions = [None] * (len(filenames) + 1)
+
+    return dd.core.new_dd_object(graph, name, meta, divisions)
+
