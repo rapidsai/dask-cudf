@@ -23,7 +23,6 @@ from toolz import partition_all
 import cudf
 from dask_cudf import batcher_sortnet, join_impl
 from dask_cudf.accessor import CachedAccessor, CategoricalAccessor, DatetimeAccessor
-from dask_cudf.utils import make_meta
 
 
 def optimize(dsk, keys, **kwargs):
@@ -72,13 +71,13 @@ class _Frame(dd.core._Frame, OperatorMethodMixin):
     def __init__(self, dsk, name, meta, divisions):
         self.dask = dsk
         self._name = name
-        meta = make_meta(meta)
+        meta = dd.core.make_meta(meta)
         if not isinstance(meta, self._partition_type):
             raise TypeError(
                 "Expected meta to specify type {0}, got type "
                 "{1}".format(self._partition_type.__name__, type(meta).__name__)
             )
-        self._meta = meta
+        self._meta = dd.core.make_meta(meta)
         self.divisions = tuple(divisions)
 
     def __getstate__(self):
@@ -204,7 +203,7 @@ class DataFrame(_Frame, dd.core.DataFrame):
             out[k] = v
             return out
 
-        meta = assigner(self._meta, k, make_meta(v))
+        meta = assigner(self._meta, k, dd.core.make_meta(v))
         return self.map_partitions(assigner, k, v, meta=meta)
 
     def apply_rows(self, func, incols, outcols, kwargs={}, cache_key=None):
@@ -842,7 +841,7 @@ def reduction(
     if meta is None:
         meta_chunk = _emulate(apply, chunk, args, chunk_kwargs)
         meta = _emulate(apply, aggregate, [[meta_chunk]], aggregate_kwargs)
-    meta = make_meta(meta)
+    meta = dd.core.make_meta(meta)
 
     for arg in args:
         if isinstance(arg, _Frame):

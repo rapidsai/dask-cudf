@@ -319,3 +319,41 @@ def test_repr(func):
     assert repr(gddf)
     if hasattr(pdf, "_repr_html_"):
         assert gddf._repr_html_()
+
+
+@pytest.fixture
+def pdf():
+    return pd.DataFrame(
+        {"x": [1, 2, 3, 4, 5, 6], "y": [11.0, 12.0, 13.0, 14.0, 15.0, 16.0]}
+    )
+
+
+@pytest.fixture
+def gdf(pdf):
+    return cudf.from_pandas(pdf)
+
+
+@pytest.fixture
+def ddf(pdf):
+    return dd.from_pandas(pdf, npartitions=3)
+
+
+@pytest.fixture
+def gddf(gdf):
+    return dd.from_pandas(gdf, npartitions=3)
+
+
+@pytest.mark.parametrize(
+    "func",
+    [
+        lambda df: df + 1,
+        lambda df: df.index,
+        lambda df: df.x.sum(),
+        lambda df: df.x.astype(float),
+        lambda df: df.assign(z=df.x.astype("int")),
+    ],
+)
+def test_unary_ops(func, gdf, gddf):
+    p = func(gdf)
+    g = func(gddf)
+    dd.assert_eq(p, g, check_names=False)
