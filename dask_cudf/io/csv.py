@@ -31,8 +31,10 @@ def read_csv(path, chunksize="256 MiB", **kwargs):
             "use the keyword ``chunksize=None to remove this message``\n"
             "Setting ``chunksize=(size of file)``" % compression
         )
+        chunksize = None
 
-        return read_csv_with_compression(path, **kwargs)
+    if chunksize is None:
+        return read_csv_without_chunksize(path, **kwargs)
 
     meta = cudf.read_csv(filenames[0], **kwargs)
     dsk = {}
@@ -70,8 +72,8 @@ def _read_csv(fn, dtypes=None, **kwargs):
     return cdf
 
 
-def read_csv_with_compression(path, **kwargs):
-    """Read CSV with Compression (gzip/zip)
+def read_csv_without_chunksize(path, **kwargs):
+    """Read entire CSV with optional compression (gzip/zip)
 
     Parameters
     ----------
