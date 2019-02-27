@@ -28,6 +28,22 @@ def test_from_cudf():
     assert_frame_equal(ddf.compute(), df)
 
 
+def test_from_cudf_with_generic_idx():
+
+    cdf = cudf.DataFrame(
+        [
+            ("a", list(range(20))),
+            ("b", list(reversed(range(20)))),
+            ("c", list(range(20))),
+        ]
+    )
+
+    ddf = dgd.from_cudf(cdf, npartitions=2)
+
+    assert isinstance(ddf.index.compute(), cudf.dataframe.index.GenericIndex)
+    dd.assert_eq(ddf.loc[1:2, ["a"]], cdf.loc[1:2, ["a"]])
+
+
 def _fragmented_gdf(df, nsplit):
     n = len(df)
 
