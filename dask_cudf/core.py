@@ -5,7 +5,6 @@ from collections import OrderedDict
 import dask
 import dask.dataframe as dd
 import numpy as np
-import pandas as pd
 from dask import compute
 from dask.base import normalize_token, tokenize
 from dask.compatibility import apply
@@ -94,90 +93,8 @@ class _Frame(dd.core._Frame, OperatorMethodMixin):
         """Create a dask.dataframe object from a dask_cudf object"""
         return self.map_partitions(M.to_pandas)
 
-    def append(self, other):
-        """ Add rows from *other* """
-        return concat([self, other])
 
-
-def _daskify(obj, npartitions=None, chunksize=None):
-    """Convert input to a dask_cudf object.
-    """
-    npartitions = npartitions or 1
-    if isinstance(obj, _Frame):
-        return obj
-    elif isinstance(obj, (pd.DataFrame, pd.Series, pd.Index)):
-        return _daskify(dd.from_pandas(obj, npartitions=npartitions))
-    elif isinstance(obj, (cudf.DataFrame, cudf.Series, cudf.Index)):
-        return from_cudf(obj, npartitions=npartitions)
-    elif isinstance(obj, (dd.DataFrame, dd.Series, dd.Index)):
-        return from_dask_dataframe(obj)
-    else:
-        raise TypeError("type {} is not supported".format(type(obj)))
-
-
-def concat_indexed_dataframes(dfs):
-    """ Concatenate indexed dataframes together along the index """
-    meta = cudf.concat(_extract_meta(dfs))
-
-    dfs2, divisions, parts = align_partitions(*dfs)
-
-    name = "concat-indexed-" + tokenize(*dfs)
-
-    parts2 = [[df for df in part] for part in parts]
-
-    dsk = dict(((name, i), (cudf.concat, part)) for i, part in enumerate(parts2))
-    for df in dfs2:
-        dsk.update(df.dask)
-
-    return dd.core.new_dd_object(dsk, name, meta, divisions)
-
-
-def stack_partitions(dfs, divisions):
-    """Concatenate partitions on axis=0 by doing a simple stack"""
-    meta = cudf.concat(_extract_meta(dfs))
-
-    name = "concat-{0}".format(tokenize(*dfs))
-    dsk = {}
-    i = 0
-    for df in dfs:
-        dsk.update(df.dask)
-
-        for key in df.__dask_keys__():
-            dsk[(name, i)] = key
-            i += 1
-
-    return dd.core.new_dd_object(dsk, name, meta, divisions)
-
-
-def concat(objs, interleave_partitions=False):
-    """Concantenate dask_cudf objects
-
-    Parameters
-    ----------
-
-    objs : sequence of DataFrame, Series, Index
-        A sequence of objects to be concatenated.
-    """
-    dfs = [_daskify(x) for x in objs]
-
-    if len(dfs) == 1:
-        return dfs[0]
-
-    if all(df.known_divisions for df in dfs):
-        if all(
-            dfs[i].divisions[-1] < dfs[i + 1].divisions[0] for i in range(len(dfs) - 1)
-        ):
-            divisions = []
-            for df in dfs[:-1]:
-                # remove last to concatenate with next
-                divisions += df.divisions[:-1]
-            divisions += dfs[-1].divisions
-            return stack_partitions(dfs, divisions)
-    elif interleave_partitions:
-        return concat_indexed_dataframes(dfs)
-    else:
-        divisions = [None] * (sum([df.npartitions for df in dfs]) + 1)
-        return stack_partitions(dfs, divisions)
+concat = dd.concat
 
 
 normalize_token.register(_Frame, lambda a: a._name)

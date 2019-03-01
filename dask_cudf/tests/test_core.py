@@ -55,86 +55,6 @@ def _fragmented_gdf(df, nsplit):
     return frags
 
 
-@pytest.mark.xfail(reason="don't agree with this functionality")
-def test_concat():
-    np.random.seed(0)
-
-    n = 1000
-    df = pd.DataFrame(
-        {"x": np.random.randint(0, 5, size=n), "y": np.random.normal(size=n)}
-    )
-
-    gdf = cudf.DataFrame.from_pandas(df)
-    frags = _fragmented_gdf(gdf, nsplit=13)
-
-    # Combine with concat
-    concated = dgd.concat(frags)
-    assert_frame_equal(df, concated)
-
-
-@pytest.mark.xfail(reason="don't agree with this functionality")
-def test_append():
-    np.random.seed(0)
-
-    n = 1000
-    df = pd.DataFrame(
-        {"x": np.random.randint(0, 5, size=n), "y": np.random.normal(size=n)}
-    )
-
-    gdf = cudf.DataFrame.from_pandas(df)
-    frags = _fragmented_gdf(gdf, nsplit=13)
-
-    # Combine with .append
-    head = frags[0]
-    tail = frags[1:]
-
-    appended = dd.from_pandas(head, npartitions=1)
-    for each in tail:
-        appended = appended.append(each)
-
-    dd.assert_eq(df, appended)
-
-
-def test_series_concat():
-    np.random.seed(0)
-
-    n = 1000
-    df = pd.DataFrame(
-        {"x": np.random.randint(0, 5, size=n), "y": np.random.normal(size=n)}
-    )
-
-    gdf = cudf.DataFrame.from_pandas(df)
-    frags = _fragmented_gdf(gdf, nsplit=13)
-
-    frags = [df.x for df in frags]
-
-    concated = dgd.concat(frags).compute().to_pandas()
-    assert isinstance(concated, pd.Series)
-    np.testing.assert_array_equal(concated, df.x)
-
-
-def test_series_append():
-    np.random.seed(0)
-
-    n = 1000
-    df = pd.DataFrame(
-        {"x": np.random.randint(0, 5, size=n), "y": np.random.normal(size=n)}
-    )
-
-    gdf = cudf.DataFrame.from_pandas(df)
-    frags = _fragmented_gdf(gdf, nsplit=13)
-
-    frags = [df.x for df in frags]
-
-    appending = dd.from_pandas(frags[0], npartitions=1)
-    for frag in frags[1:]:
-        appending = appending.append(frag)
-
-    appended = appending.compute().to_pandas()
-    assert isinstance(appended, pd.Series)
-    np.testing.assert_array_equal(appended, df.x)
-
-
 def test_query():
     np.random.seed(0)
 
@@ -373,3 +293,18 @@ def test_unary_ops(func, gdf, gddf):
     p = func(gdf)
     g = func(gddf)
     dd.assert_eq(p, g, check_names=False)
+
+
+@pytest.mark.parametrize("series", [True, False])
+def test_concat(gdf, gddf, series):
+    if series:
+        gdf = gdf.x
+        gddf = gddf.x
+    a = cudf.concat([gdf, gdf + 1, gdf + 2]).sort_values("x").reset_index(drop=True)
+    b = (
+        dd.concat([gddf, gddf + 1, gddf + 2], interleave_partitions=True)
+        .compute()
+        .sort_values("x")
+        .reset_index(drop=True)
+    )
+    dd.assert_eq(a, b)

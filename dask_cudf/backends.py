@@ -30,5 +30,4 @@ def make_meta_cudf_index(x, index=None):
 def concat_cudf(dfs, axis=0, join="outer", uniform=False, filter_warning=True):
     assert axis == 0
     assert join == "outer"
-    assert filter_warning is True
     return cudf.concat(dfs)
