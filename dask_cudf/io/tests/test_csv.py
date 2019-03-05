@@ -11,10 +11,16 @@ def test_read_csv(tmp_path):
     df = dask.datasets.timeseries(dtypes={"x": int, "y": int}, freq="120s").reset_index(
         drop=True
     )
+
     df.to_csv(tmp_path / "data-*.csv", index=False)
 
-    df2 = dask_cudf.read_csv(tmp_path / "*.csv")
+    df2 = dask_cudf.read_csv(tmp_path / "data-*.csv")
     dd.assert_eq(df, df2)
+
+    # file path test
+    stmp_path = str(tmp_path / "data-*.csv")
+    df3 = dask_cudf.read_csv(f"file://{stmp_path}")
+    dd.assert_eq(df2, df3)
 
 
 def test_read_csv_w_bytes(tmp_path):

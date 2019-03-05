@@ -2,18 +2,25 @@ import os
 from glob import glob
 from warnings import warn
 
-import pandas as pd
-
 from dask.base import tokenize
 from dask.compatibility import apply
 import dask.dataframe as dd
 from dask.utils import parse_bytes
+from dask.dataframe.io.csv import make_reader
 
 import cudf
 from libgdf_cffi import GDFError
 
 
 def read_csv(path, chunksize="256 MiB", **kwargs):
+    if "://" in str(path):
+        func = make_reader(cudf.read_csv, "read_csv", "CSV")
+        return func(path, blocksize=chunksize, **kwargs)
+    else:
+        return _internal_read_csv(path=path, chunksize=chunksize, **kwargs)
+
+
+def _internal_read_csv(path, chunksize="256 MiB", **kwargs):
     if isinstance(chunksize, str):
         chunksize = parse_bytes(chunksize)
     filenames = sorted(glob(str(path)))  # TODO: lots of complexity
