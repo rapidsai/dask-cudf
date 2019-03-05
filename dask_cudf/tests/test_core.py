@@ -257,6 +257,41 @@ def test_repr(func):
         assert gddf._repr_html_()
 
 
+@pytest.mark.xfail(reason="datetime indexes not fully supported in cudf")
+@pytest.mark.parametrize("start", ["1d", "5d", "1w", "12h"])
+@pytest.mark.parametrize("stop", ["1d", "3d", "8h"])
+def test_repartition_timeseries(start, stop):
+    pdf = dask.datasets.timeseries(
+        "2000-01-01",
+        "2000-01-31",
+        freq="1s",
+        partition_freq=start,
+        dtypes={"x": int, "y": float},
+    )
+    gdf = pdf.map_partitions(cudf.DataFrame.from_pandas)
+
+    a = pdf.repartition(freq=stop)
+    b = gdf.repartition(freq=stop)
+    assert a.divisions == b.divisions
+
+    dd.utils.assert_eq(a, b)
+
+
+@pytest.mark.parametrize("start", [1, 2, 5])
+@pytest.mark.parametrize("stop", [1, 3, 7])
+def test_repartition_simple_divisions(start, stop):
+    pdf = pd.DataFrame({"x": range(100)})
+
+    pdf = dd.from_pandas(pdf, npartitions=start)
+    gdf = pdf.map_partitions(cudf.DataFrame.from_pandas)
+
+    a = pdf.repartition(npartitions=stop)
+    b = gdf.repartition(npartitions=stop)
+    assert a.divisions == b.divisions
+
+    dd.utils.assert_eq(a, b)
+
+
 @pytest.fixture
 def pdf():
     return pd.DataFrame(

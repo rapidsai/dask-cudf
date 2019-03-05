@@ -1,10 +1,10 @@
 from functools import partial
 
+import pandas as pd
 import numpy as np
 import pytest
 
 import cudf
-import cudf as gd
 import dask_cudf as dgd
 import dask.dataframe as dd
 
@@ -21,13 +21,13 @@ def test_join_inner(left_nrows, right_nrows, left_nkeys, right_nkeys):
     np.random.seed(0)
 
     # cuDF
-    left = gd.DataFrame(
+    left = cudf.DataFrame(
         {
             "x": np.random.randint(0, left_nkeys, size=left_nrows),
             "a": np.arange(left_nrows),
         }.items()
     )
-    right = gd.DataFrame(
+    right = cudf.DataFrame(
         {
             "x": np.random.randint(0, right_nkeys, size=right_nrows),
             "a": 1000 * np.arange(right_nrows),
@@ -76,13 +76,13 @@ def test_join_left(left_nrows, right_nrows, left_nkeys, right_nkeys, how):
     np.random.seed(0)
 
     # cuDF
-    left = gd.DataFrame(
+    left = cudf.DataFrame(
         {
             "x": np.random.randint(0, left_nkeys, size=left_nrows),
             "a": np.arange(left_nrows, dtype=np.float64),
         }.items()
     )
-    right = gd.DataFrame(
+    right = cudf.DataFrame(
         {
             "x": np.random.randint(0, right_nkeys, size=right_nrows),
             "a": 1000 * np.arange(right_nrows, dtype=np.float64),
@@ -135,14 +135,14 @@ def test_merge_left(left_nrows, right_nrows, left_nkeys, right_nkeys, how="left"
     np.random.seed(0)
 
     # cuDF
-    left = gd.DataFrame(
+    left = cudf.DataFrame(
         {
             "x": np.random.randint(0, left_nkeys, size=left_nrows),
             "y": np.random.randint(0, left_nkeys, size=left_nrows),
             "a": np.arange(left_nrows, dtype=np.float64),
         }.items()
     )
-    right = gd.DataFrame(
+    right = cudf.DataFrame(
         {
             "x": np.random.randint(0, right_nkeys, size=right_nrows),
             "y": np.random.randint(0, right_nkeys, size=right_nrows),
@@ -178,13 +178,13 @@ def test_merge_1col_left(left_nrows, right_nrows, left_nkeys, right_nkeys, how="
     np.random.seed(0)
 
     # cuDF
-    left = gd.DataFrame(
+    left = cudf.DataFrame(
         {
             "x": np.random.randint(0, left_nkeys, size=left_nrows),
             "a": np.arange(left_nrows, dtype=np.float64),
         }.items()
     )
-    right = gd.DataFrame(
+    right = cudf.DataFrame(
         {
             "x": np.random.randint(0, right_nkeys, size=right_nrows),
             "a": 1000 * np.arange(right_nrows, dtype=np.float64),
@@ -205,6 +205,22 @@ def test_merge_1col_left(left_nrows, right_nrows, left_nkeys, right_nkeys, how="
     got = got.sort_values(["x", "a_x", "a_y"]).reset_index(drop=True)
 
     dd.assert_eq(expect, got)
+
+
+@pytest.mark.parametrize("how", ["inner", "left"])
+def test_indexed_join(how):
+    p_left = pd.DataFrame({"x": np.arange(10)}, index=np.arange(10) * 2)
+    p_right = pd.DataFrame({"y": 1}, index=np.arange(15))
+
+    g_left = cudf.from_pandas(p_left)
+    g_right = cudf.from_pandas(p_right)
+
+    dg_left = dd.from_pandas(g_left, npartitions=4)
+    dg_right = dd.from_pandas(g_right, npartitions=5)
+
+    d = g_left.merge(g_right, left_index=True, right_index=True, how=how)
+    dg = dg_left.merge(dg_right, left_index=True, right_index=True, how=how)
+    dd.assert_eq(d, dg)
 
 
 @pytest.mark.parametrize("how", ["left", "inner"])

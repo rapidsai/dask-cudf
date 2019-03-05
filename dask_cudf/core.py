@@ -158,14 +158,36 @@ class DataFrame(_Frame, dd.core.DataFrame):
         callenv = {"locals": {}, "globals": {}}
         return self.map_partitions(query, expr, callenv, meta=self._meta)
 
-    def merge(self, other, on=None, how="left", lsuffix="_x", rsuffix="_y"):
+    def merge(
+        self,
+        other,
+        on=None,
+        how="left",
+        left_index=False,
+        right_index=False,
+        suffixes=("_x", "_y"),
+    ):
         """Merging two dataframes on the column(s) indicated in *on*.
         """
+        if left_index or right_index:
+            return dd.merge(
+                self,
+                other,
+                how=how,
+                suffixes=suffixes,
+                left_index=left_index,
+                right_index=right_index,
+            )
         if on is None:
-            return self.join(other, how=how, lsuffix=lsuffix, rsuffix=rsuffix)
+            return self.join(other, how=how, lsuffix=suffixes[0], rsuffix=suffixes[1])
         else:
             return join_impl.join_frames(
-                left=self, right=other, on=on, how=how, lsuffix=lsuffix, rsuffix=rsuffix
+                left=self,
+                right=other,
+                on=on,
+                how=how,
+                lsuffix=suffixes[0],
+                rsuffix=suffixes[1],
             )
 
     def join(self, other, how="left", lsuffix="", rsuffix=""):
