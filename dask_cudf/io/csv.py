@@ -23,7 +23,12 @@ def read_csv(path, chunksize="256 MiB", **kwargs):
 def _internal_read_csv(path, chunksize="256 MiB", **kwargs):
     if isinstance(chunksize, str):
         chunksize = parse_bytes(chunksize)
-    filenames = sorted(glob(str(path)))  # TODO: lots of complexity
+
+    filenames = sorted(glob(str(path)))
+    if not filenames:
+        msg = f"A file in: {filenames} does not exist."
+        raise FileNotFoundError(msg)
+
     name = "read-csv-" + tokenize(
         path, tokenize, **kwargs
     )  # TODO: get last modified time
