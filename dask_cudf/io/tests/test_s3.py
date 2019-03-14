@@ -1,15 +1,16 @@
 import os
 import pytest
 from contextlib import contextmanager
-from dask.bytes.s3 import DaskS3FileSystem
+
 
 import dask_cudf
 
+s3fs = pytest.importorskip("s3fs")
+boto3 = pytest.importorskip("boto3")
+moto = pytest.importorskip("moto")
+httpretty = pytest.importorskip("httpretty")
 
-s3fs = pytest.importorskip('s3fs')
-boto3 = pytest.importorskip('boto3')
-moto = pytest.importorskip('moto')
-httpretty = pytest.importorskip('httpretty')
+from dask.bytes.s3 import DaskS3FileSystem
 
 
 @contextmanager
@@ -36,8 +37,8 @@ def s3_context(bucket, files):
         os.environ.setdefault("AWS_SECRET_ACCESS_KEY", "foobar_secret")
 
         with moto.mock_s3():
-            client = boto3.client('s3')
-            client.create_bucket(Bucket=bucket, ACL='public-read-write')
+            client = boto3.client("s3")
+            client.create_bucket(Bucket=bucket, ACL="public-read-write")
             for f, data in files.items():
                 client.put_object(Bucket=bucket, Key=f, Body=data)
 
@@ -54,7 +55,8 @@ def s3_context(bucket, files):
 
 
 def test_read_csv():
-    with s3_context('csv', {'a.csv': b'a,b\n1,2\n3,4\n'}) as s3:
-        df = dask_cudf.read_csv('s3://csv/*.csv', chunksize="50 B",
-                                storage_options={'s3': s3})
+    with s3_context("csv", {"a.csv": b"a,b\n1,2\n3,4\n"}) as s3:
+        df = dask_cudf.read_csv(
+            "s3://csv/*.csv", chunksize="50 B", storage_options={"s3": s3}
+        )
         assert df.a.sum().compute() == 4
