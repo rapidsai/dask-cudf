@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # Adopted from https://github.com/tmcdonell/travis-scripts/blob/dfaac280ac2082cd6bcaba3217428347899f2975/update-accelerate-buildbot.sh
-export UPLOADFILE=`conda build conda-recipes -c nvidia -c rapidsai -c rapidsai-nightly -c numba -c conda-forge -c defaults --python $PYTHON --output`
+export UPLOADFILE=`conda build conda/recipes/dask-cudf -c nvidia -c rapidsai -c rapidsai-nightly -c numba -c defaults -c conda-forge --python=$PYTHON --output`
 
 set -e
 
