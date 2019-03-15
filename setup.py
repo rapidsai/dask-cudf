@@ -1,19 +1,34 @@
-from os.path import exists
-from setuptools import setup
-import versioneer
+import os
+from codecs import open
 
-packages = ["dask_cudf", "dask_cudf.io"]
+from setuptools import find_packages, setup
 
-packages = packages + [p + ".tests" for p in packages]
+# Get the long description from the README file
+with open(os.path.join(os.path.dirname(__file__), "README.md")) as f:
+    long_description = f.read()
 
+version = os.environ.get('GIT_DESCRIBE_TAG', '0.0.0.dev0').lstrip('v')
 setup(
-    name="dask_cudf",
-    version=versioneer.get_version(),
-    cmdclass=versioneer.get_cmdclass(),
-    description="A Partitioned GPU DataFrame",
-    license="Apache Software License 2.0",
-    url="https://github.com/rapidsai/dask_cudf",
-    long_description=(open("README.rst").read() if exists("README.rst") else ""),
-    packages=packages,
-    zip_safe=False,
+    name="dask-cudf",
+    version=version,
+    description="Utilities for Dask and cuDF interactions",
+    long_description=long_description,
+    long_description_content_type='text/markdown',
+    url="https://github.com/rapidsai/dask-cudf",
+    author="NVIDIA Corporation",
+    license="Apache 2.0",
+    classifiers=[
+        "Intended Audience :: Developers",
+        "Topic :: Database",
+        "Topic :: Scientific/Engineering",
+        "License :: OSI Approved :: Apache License",
+        "Programming Language :: Python :: 3.6",
+        "Programming Language :: Python :: 3.7",
+    ],
+    packages=find_packages(exclude=["docs", "tests", "tests.*", "docs.*"]),
+    install_requires=open('requirements.txt').read().strip().split('\n'),
+    entry_points='''
+        [console_scripts]
+        dask-cuda-worker=dask_cuda.dask_cuda_worker:go
+      ''',
 )

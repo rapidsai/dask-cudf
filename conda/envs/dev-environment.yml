@@ -1,0 +1,38 @@
+name: dask-cudf-dev
+channels:
+  - nvidia
+  - rapidsai
+  - numba
+  - conda-forge
+  - defaults
+dependencies:
+  - cmake>=3.12
+  - python>=3.6,<3.8
+  - numba>=0.40
+  - pandas>=0.23.4
+  - pyarrow=0.12.0
+  - notebook>=0.5.0
+  - boost
+  - nvstrings
+  - cffi>=1.10.0
+  - cython>=0.29,<0.30
+  - pytest
+  - sphinx
+  - sphinx_rtd_theme
+  - sphinxcontrib-websupport
+  - nbsphinx
+  - numpydoc
+  - ipython
+  - recommonmark
+  - pytest
+  - partd
+  - moto
+  - boto3
+  - httpretty
+  - flake8
+  - dask
+  - s3fs
+  - pip:
+      - git+https://github.com/dask/dask.git
+      - git+https://github.com/dask/distributed.git
+
