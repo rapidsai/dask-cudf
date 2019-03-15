@@ -13,12 +13,12 @@ build:
 requirements:
   build:
     - python x.x
-    - cudf 0.5*
+    - cudf 0.6*
     - dask>=0.19.0
     - distributed>=1.23.0
   run:
     - python x.x
-    - cudf 0.5*
+    - cudf 0.6*
     - dask>=0.19.0
     - distributed>=1.23.0
 test:

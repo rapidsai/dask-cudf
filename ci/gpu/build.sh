@@ -37,7 +37,7 @@ $CXX --version
 
 logger "Setup new environment..."
 conda install -c rapidsai -c rapidsai-nightly -c nvidia -c conda-forge -c defaults \
-    cudf>=0.5 \
+    cudf>=0.6 \
     dask>=0.19.0 \
     distributed>=1.23.0
 
