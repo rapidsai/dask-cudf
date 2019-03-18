@@ -1,7 +1,7 @@
 # Usage:
 #   conda build -c defaults -c conda-forge .
 package:
-  name: dask_cudf
+  name: dask-cudf
   version: {{ environ.get('GIT_DESCRIBE_TAG', '0.0.0.dev').lstrip('v') }}
 
 source:
