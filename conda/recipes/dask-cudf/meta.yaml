@@ -23,7 +23,7 @@ requirements:
     - distributed >=1.23.0
 test:
   imports:
-    - dask-cudf
+    - dask_cudf
 
 about:
   home: http://rapids.ai
