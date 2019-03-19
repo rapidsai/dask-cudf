@@ -9,7 +9,7 @@ SOURCE_BRANCH=master
 
 test -e ${UPLOADFILE}
 
-LABEL_OPTION="--label main"
+LABEL_OPTION="--label main --label cuda9.2 --label cuda10.0"
 
 # Restrict uploads to master branch
 if [ ${GIT_BRANCH} != ${SOURCE_BRANCH} ]; then
