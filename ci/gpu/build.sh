@@ -36,7 +36,7 @@ $CC --version
 $CXX --version
 
 logger "Setup new environment..."
-conda install -c rapidsai -c rapidsai-nightly -c nvidia -c conda-forge -c defaults \
+conda install -c rapidsai -c rapidsai-nightly -c nvidia -c conda-forge \
     cudf=0.6* \
     pyarrow=0.12.1 \
     dask \
