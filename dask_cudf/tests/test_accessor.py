@@ -167,7 +167,7 @@ def test_categorical_compare_ordered(data):
 
     # Test inequality
     out = dsr1 != dsr1
-    assert not np.any(out.compute())
+    assert not np.any(out.compute().to_array())
     assert not np.any(pdsr1 != pdsr1)
 
     assert dsr1.cat.ordered
