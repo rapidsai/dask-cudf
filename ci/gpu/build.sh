@@ -13,6 +13,7 @@ function logger() {
 # Set path and build parallel level
 export PATH=/conda/bin:/usr/local/cuda/bin:$PATH
 export PARALLEL_LEVEL=4
+export CUDA_REL=${CUDA_VERSION%.*}
 
 # Set home to the job's workspace
 export HOME=$WORKSPACE
@@ -36,12 +37,11 @@ $CC --version
 $CXX --version
 
 logger "Setup new environment..."
-conda install -y -q -c rapidsai -c rapidsai-nightly -c nvidia -c conda-forge -c defaults \
+conda install -c rapidsai/label/cuda$CUDA_REL -c rapidsai-nightly/label/cuda$CUDA_REL -c nvidia/label/cuda$CUDA_REL -c conda-forge \
     cudf=0.6* \
-    nvstrings=0.3* \
     pyarrow=0.12.1 \
-    dask>=0.19.0 \
-    distributed>=1.23.0
+    dask \
+    distributed\>=1.23.0
 
 conda list
 
