@@ -162,12 +162,12 @@ def test_categorical_compare_ordered(data):
     # Test equality
     out = dsr1 == dsr1
     assert out.dtype == np.bool_
-    assert np.all(out.compute())
+    assert np.all(out.compute().to_array())
     assert np.all(pdsr1 == pdsr1)
 
     # Test inequality
     out = dsr1 != dsr1
-    assert not np.any(out.compute())
+    assert not np.any(out.compute().to_array())
     assert not np.any(pdsr1 != pdsr1)
 
     assert dsr1.cat.ordered

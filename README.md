@@ -16,7 +16,7 @@ Setup from source repo:
 
         source activate dask-cudf
 
-3.  Clone `dask_gdf` repo:
+3.  Clone `dask-cudf` repo:
 
         git clone https://github.com/rapidsai/dask-cudf
 

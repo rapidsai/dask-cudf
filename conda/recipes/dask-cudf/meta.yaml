@@ -1,24 +1,26 @@
 # Usage:
 #   conda build -c defaults -c conda-forge .
 package:
-  name: dask_cudf
+  name: dask-cudf
   version: {{ environ.get('GIT_DESCRIBE_TAG', '0.0.0.dev').lstrip('v') }}
 
 source:
-  path: ..
+  path: ../../..
 
 build:
   number: {{ environ.get('GIT_DESCRIBE_NUMBER', 0) }}
 
 requirements:
   build:
-    - python
-  run:
-    - python
-    - cudf
+    - python x.x
+    - cudf 0.6*
     - dask >=0.19.0
     - distributed >=1.23.0
-    - pandas 0.20.3
+  run:
+    - python x.x
+    - cudf 0.6*
+    - dask >=0.19.0
+    - distributed >=1.23.0
 test:
   imports:
     - dask_cudf
@@ -26,5 +28,5 @@ test:
 about:
   home: http://rapids.ai
   license: Apache
-  # license_file: LICENSE
-  summary: A Partitioned GPU Dataframe
+  license_file: ../../../LICENSE.txt
+  summary: dask-cudf library
