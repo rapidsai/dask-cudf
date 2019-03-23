@@ -1,5 +1,5 @@
-2019-03-18 - 0.6.0
-------------------
+dask-cudf 0.6.0 (22 Mar 2019)
+-----------------------------
 
 In this release we aligned Dask cuDF to the mainline Dask Dataframe
 codebase.  This was made possible by an alignment of cuDF to Pandas, and
