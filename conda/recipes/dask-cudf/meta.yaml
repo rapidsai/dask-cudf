@@ -1,14 +1,18 @@
 # Usage:
 #   conda build -c defaults -c conda-forge .
+{% set version = environ.get('GIT_DESCRIBE_TAG', '0.0.0.dev').lstrip('v') %}
+{% set git_revision_count=environ.get('GIT_DESCRIBE_NUMBER', 0) %}
+{% set py_version=environ.get('CONDA_PY', 36) %}
 package:
   name: dask-cudf
-  version: {{ environ.get('GIT_DESCRIBE_TAG', '0.0.0.dev').lstrip('v') }}
+  version: {{ version }}
 
 source:
   path: ../../..
 
 build:
-  number: {{ environ.get('GIT_DESCRIBE_NUMBER', 0) }}
+  number: {{ git_revision_count }}
+  string: py{{ py_version }}_{{ git_revision_count }}
 
 requirements:
   build:
