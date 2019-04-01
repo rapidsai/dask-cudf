@@ -34,7 +34,7 @@ def _internal_read_csv(path, chunksize="256 MiB", **kwargs):
     )  # TODO: get last modified time
 
     compression = kwargs.get("compression", False)
-    if compression:
+    if compression and chunksize:
         # compressed CSVs reading must read the entire file
         kwargs.pop("byte_range", None)
         warn(
