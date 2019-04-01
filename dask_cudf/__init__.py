@@ -9,6 +9,7 @@ from .core import (
 from .io import read_csv
 from . import backends
 
+import cudf
 from cudf._version import get_versions
 
 __version__ = get_versions()["version"]
@@ -22,3 +23,7 @@ __all__ = [
     "concat",
     "from_delayed",
 ]
+
+if not hasattr(cudf.DataFrame, "mean"):
+    cudf.DataFrame.mean = None
+del cudf

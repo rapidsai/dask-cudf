@@ -169,7 +169,15 @@ class DataFrame(_Frame, dd.core.DataFrame):
     ):
         """Merging two dataframes on the column(s) indicated in *on*.
         """
-        if left_index or right_index:
+        if (
+            left_index
+            or right_index
+            or not dask.is_dask_collection(other)
+            or self.npartitions == 1
+            and how in ("inner", "right")
+            or other.npartitions == 1
+            and how in ("inner", "left")
+        ):
             return dd.merge(
                 self,
                 other,
@@ -178,17 +186,20 @@ class DataFrame(_Frame, dd.core.DataFrame):
                 left_index=left_index,
                 right_index=right_index,
             )
-        if on is None:
-            return self.join(other, how=how, lsuffix=suffixes[0], rsuffix=suffixes[1])
-        else:
-            return join_impl.join_frames(
-                left=self,
-                right=other,
-                on=on,
-                how=how,
-                lsuffix=suffixes[0],
-                rsuffix=suffixes[1],
-            )
+
+        if not on and not left_index and not right_index:
+            on = [c for c in self.columns if c in other.columns]
+            if not on:
+                left_index = right_index = True
+
+        return join_impl.join_frames(
+            left=self,
+            right=other,
+            on=on,
+            how=how,
+            lsuffix=suffixes[0],
+            rsuffix=suffixes[1],
+        )
 
     def join(self, other, how="left", lsuffix="", rsuffix=""):
         """Join two datatframes
