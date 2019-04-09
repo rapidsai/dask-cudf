@@ -1,3 +1,9 @@
+0.6.1 - 2019-04-09
+------------------
+
+-  Add cudf.DataFrame.mean = None (#205) `Matthew Rocklin`_
+
+
 dask-cudf 0.6.0 (22 Mar 2019)
 -----------------------------
 
