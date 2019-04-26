@@ -37,8 +37,11 @@ $CC --version
 $CXX --version
 
 logger "Setup new environment..."
+# FIXME: cudf 0.7 post build _652 is required in order to properly
+# ensure rmm is also present. This additional restriction should be
+# removed when the cudf dependency is upgraded for 0.8
 conda install -c rapidsai/label/cuda$CUDA_REL -c rapidsai-nightly/label/cuda$CUDA_REL -c nvidia/label/cuda$CUDA_REL -c conda-forge \
-    'cudf 0.7*,>*py36_652' \
+    'cudf=0.7*=py3*_8*' \
     'pyarrow=0.12.1' \
     'dask>=1.1.5'
 pip install git+https://github.com/dask/dask.git --upgrade --no-deps
