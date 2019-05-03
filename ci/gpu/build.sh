@@ -38,7 +38,7 @@ $CXX --version
 
 logger "Setup new environment..."
 conda install -c rapidsai/label/cuda$CUDA_REL -c rapidsai-nightly/label/cuda$CUDA_REL -c nvidia/label/cuda$CUDA_REL -c conda-forge \
-    'cudf>=0.7*' \
+    'cudf=0.7*' \
     'pyarrow=0.12.1' \
     'dask>=1.1.5'
 pip install git+https://github.com/dask/dask.git --upgrade --no-deps
