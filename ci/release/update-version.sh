@@ -38,8 +38,6 @@ else
   exit 1
 fi
 
-# Move to root of repo
-cd ../..
 echo "Preparing '$RELEASE_TYPE' release [$CURRENT_TAG -> $NEXT_FULL_TAG]"
 
 # Inplace sed replace; workaround for Linux and Mac
