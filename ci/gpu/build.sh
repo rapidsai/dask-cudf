@@ -41,7 +41,7 @@ logger "Setup new environment..."
 # ensure rmm is also present. This additional restriction should be
 # removed when the cudf dependency is upgraded for 0.8
 conda install -c rapidsai/label/cuda$CUDA_REL -c rapidsai-nightly/label/cuda$CUDA_REL -c nvidia/label/cuda$CUDA_REL -c conda-forge \
-    'cudf=0.7*=py3*_8*' \
+    'cudf=0.7*' \
     'pyarrow=0.12.1' \
     'dask>=1.1.5'
 pip install git+https://github.com/dask/dask.git --upgrade --no-deps
