@@ -16,10 +16,10 @@ from dask.dataframe.utils import raise_on_meta_error
 from dask.delayed import delayed
 from dask.optimization import cull, fuse
 from dask.utils import M, OperatorMethodMixin, funcname
-from libgdf_cffi import libgdf
 from toolz import partition_all
 
 import cudf
+import cudf.bindings.reduce as cpp_reduce
 from dask_cudf import batcher_sortnet, join_impl
 from dask_cudf.accessor import CachedAccessor, CategoricalAccessor, DatetimeAccessor
 
@@ -508,7 +508,7 @@ class DataFrame(_Frame, dd.core.DataFrame):
 
 def sum_of_squares(x):
     x = x.astype("f8")._column
-    outcol = cudf._gdf.apply_reduce(libgdf.gdf_sum_squared_generic, x)
+    outcol = cpp_reduce.apply_reduce("sum_of_squares", x)
     return cudf.Series(outcol)
 
 
