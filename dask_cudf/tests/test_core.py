@@ -272,10 +272,12 @@ def test_repr(func):
         assert gddf._repr_html_()
 
 
-@pytest.mark.xfail(reason="datetime indexes not fully supported in cudf")
+@pytest.mark.skip(reason="datetime indexes not fully supported in cudf")
 @pytest.mark.parametrize("start", ["1d", "5d", "1w", "12h"])
 @pytest.mark.parametrize("stop", ["1d", "3d", "8h"])
 def test_repartition_timeseries(start, stop):
+    # This test is currently absurdly slow.  It should not be unskipped without
+    # slimming it down.
     pdf = dask.datasets.timeseries(
         "2000-01-01",
         "2000-01-31",
