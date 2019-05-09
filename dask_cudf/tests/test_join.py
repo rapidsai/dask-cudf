@@ -241,6 +241,25 @@ def test_how(how):
     )
 
 
+@pytest.mark.parametrize("how", ["inner", "left"])
+@pytest.mark.parametrize("on", ["id_1", ["id_1"], ["id_1", "id_2"]])
+def test_on(how, on):
+    left = cudf.DataFrame({"id_1": [1, 2, 3, 4, 5], "id_2": [1.0, 2.0, 3.0, 4.0, 0.0]})
+    right = cudf.DataFrame({"id_1": [2, 3, None, 2], "id_2": [2.0, 3.0, 4.0, 20]})
+
+    dleft = dd.from_pandas(left, npartitions=2)
+    dright = dd.from_pandas(right, npartitions=3)
+
+    expected = left.merge(right, how=how, on=on)
+    result = dleft.merge(dright, how=how, on=on)
+
+    dd.assert_eq(
+        result.compute().to_pandas().sort_values(on),
+        expected.to_pandas().sort_values(on),
+        check_index=False,
+    )
+
+
 def test_single_partition():
     left = cudf.DataFrame({"x": range(200), "y": range(200)})
     right = cudf.DataFrame({"x": range(100), "z": range(100)})
