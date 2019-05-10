@@ -11,6 +11,12 @@ dask-cudf 0.7.0 (10 May 2019)
 -  Fix gpuCI build script (#173) `Dillon Cullinan`_
 
 
+0.6.1 - 2019-04-09
+------------------
+
+-  Add cudf.DataFrame.mean = None (#205) `Matthew Rocklin`_
+
+
 dask-cudf 0.6.0 (22 Mar 2019)
 -----------------------------
 
