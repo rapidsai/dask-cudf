@@ -2,6 +2,7 @@ name: dask-cudf-dev
 channels:
   - nvidia
   - rapidsai
+  - rapidsai-nightly
   - numba
   - conda-forge
   - defaults
