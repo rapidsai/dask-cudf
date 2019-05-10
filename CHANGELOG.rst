@@ -1,4 +1,4 @@
-dask-cudf 0.7.0 (13 May 2019)
+dask-cudf 0.7.0 (10 May 2019)
 -----------------------------
 
 -  Remove dependency on libgdf_cffi (#228) `Keith Kraus`_
