@@ -7,13 +7,13 @@ from setuptools import find_packages, setup
 with open(os.path.join(os.path.dirname(__file__), "README.md")) as f:
     long_description = f.read()
 
-version = os.environ.get('GIT_DESCRIBE_TAG', '0.0.0.dev0').lstrip('v')
+version = os.environ.get("GIT_DESCRIBE_TAG", "0.0.0.dev0").lstrip("v")
 setup(
     name="dask-cudf",
     version=version,
     description="Utilities for Dask and cuDF interactions",
     long_description=long_description,
-    long_description_content_type='text/markdown',
+    long_description_content_type="text/markdown",
     url="https://github.com/rapidsai/dask-cudf",
     author="NVIDIA Corporation",
     license="Apache 2.0",
@@ -26,9 +26,5 @@ setup(
         "Programming Language :: Python :: 3.7",
     ],
     packages=find_packages(exclude=["docs", "tests", "tests.*", "docs.*"]),
-    install_requires=open('requirements.txt').read().strip().split('\n'),
-    entry_points='''
-        [console_scripts]
-        dask-cuda-worker=dask_cuda.dask_cuda_worker:go
-      ''',
+    install_requires=open("requirements.txt").read().strip().split("\n"),
 )
