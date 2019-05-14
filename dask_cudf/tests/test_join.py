@@ -246,6 +246,29 @@ def test_how(how):
     )
 
 
+@pytest.mark.parametrize("daskify", [True, False])
+def test_single_dataframe_merge(daskify):
+    right = cudf.DataFrame({"x": [1, 2, 1, 2], "y": [1, 2, 3, 4]})
+    left = cudf.DataFrame({"x": np.arange(100) % 10, "z": np.arange(100)})
+
+    dleft = dd.from_pandas(left, npartitions=10)
+
+    if daskify:
+        dright = dd.from_pandas(right, npartitions=1)
+    else:
+        dright = right
+
+    expected = left.merge(right, how="inner")
+    result = dd.merge(dleft, dright, how="inner")
+    assert len(result.dask) < 25
+
+    dd.assert_eq(
+        result.compute().to_pandas().sort_values(["z", "y"]),
+        expected.to_pandas().sort_values(["z", "y"]),
+        check_index=False,
+    )
+
+
 @pytest.mark.parametrize("how", ["inner", "left"])
 @pytest.mark.parametrize("on", ["id_1", ["id_1"], ["id_1", "id_2"]])
 def test_on(how, on):
