@@ -368,3 +368,11 @@ def test_concat(gdf, gddf, series):
         .reset_index(drop=True)
     )
     dd.assert_eq(a, b)
+
+
+def test_boolean_index(gdf, gddf):
+
+    gdf2 = gdf[gdf.x > 2]
+    gddf2 = gddf[gddf.x > 2]
+
+    dd.assert_eq(gdf2, gddf2)
