@@ -1,6 +1,7 @@
 # Usage:
 #   conda build -c defaults -c conda-forge .
 {% set version = environ.get('GIT_DESCRIBE_TAG', '0.0.0.dev').lstrip('v') %}
+{% set minor_version =  version.split('.')[0] + '.' + version.split('.')[1] %}
 {% set git_revision_count=environ.get('GIT_DESCRIBE_NUMBER', 0) %}
 {% set py_version=environ.get('CONDA_PY', 36) %}
 package:
@@ -17,12 +18,12 @@ build:
 requirements:
   host:
     - python x.x
-    - cudf 0.7*
+    - cudf {{minor_version}}.*
     - dask >=1.2.2
     - distributed >=1.23.0
   run:
     - python x.x
-    - cudf 0.7*
+    - cudf {{minor_version}}.*
     - dask >=1.2.2
     - distributed >=1.23.0
 test:

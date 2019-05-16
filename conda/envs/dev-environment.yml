@@ -3,19 +3,16 @@ channels:
   - nvidia
   - rapidsai
   - rapidsai-nightly
-  - numba
   - conda-forge
   - defaults
 dependencies:
   - cmake>=3.12
   - python>=3.6,<3.8
-  - numba>=0.40
+  - numba>=0.41
   - pandas>=0.23.4
   - pyarrow=0.12.1
   - notebook>=0.5.0
-  - boost
   - nvstrings
-  - cffi>=1.10.0
   - cython>=0.29,<0.30
   - pytest
   - sphinx
