@@ -6,7 +6,7 @@ from .core import (
     concat,
     from_delayed,
 )
-from .io import read_csv, read_orc
+from .io import read_csv, read_orc, read_json
 from . import backends
 
 import cudf
