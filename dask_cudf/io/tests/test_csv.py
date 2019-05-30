@@ -1,3 +1,5 @@
+import warnings
+
 import dask
 import dask_cudf
 import dask.dataframe as dd
@@ -55,3 +57,10 @@ def test_read_csv_compression(tmp_path):
 
     assert df2.npartitions is 1
     dd.assert_eq(df2, df, check_index=False)
+
+    with warnings.catch_warnings(record=True) as record:
+        df2 = dask_cudf.read_csv(
+            tmp_path / "*.csv.gz", chunksize=None, compression="gzip"
+        )
+
+        assert not record

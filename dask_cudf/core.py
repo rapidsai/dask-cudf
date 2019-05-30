@@ -16,10 +16,10 @@ from dask.dataframe.utils import raise_on_meta_error
 from dask.delayed import delayed
 from dask.optimization import cull, fuse
 from dask.utils import M, OperatorMethodMixin, funcname
-from libgdf_cffi import libgdf
 from toolz import partition_all
 
 import cudf
+import cudf.bindings.reduce as cpp_reduce
 from dask_cudf import batcher_sortnet, join_impl
 from dask_cudf.accessor import CachedAccessor, CategoricalAccessor, DatetimeAccessor
 
@@ -100,17 +100,6 @@ concat = dd.concat
 normalize_token.register(_Frame, lambda a: a._name)
 
 
-def query(df, expr, callenv):
-    boolmask = cudf.utils.queryutils.query_execute(df, expr, callenv)
-
-    selected = cudf.Series(boolmask)
-    newdf = cudf.DataFrame()
-    for col in df.columns:
-        newseries = df[col][selected]
-        newdf[col] = newseries
-    return newdf
-
-
 class DataFrame(_Frame, dd.core.DataFrame):
     _partition_type = cudf.DataFrame
 
@@ -137,27 +126,6 @@ class DataFrame(_Frame, dd.core.DataFrame):
             do_apply_rows, func, incols, outcols, kwargs, meta=meta
         )
 
-    def query(self, expr):
-        """Query with a boolean expression using Numba to compile a GPU kernel.
-
-        See pandas.DataFrame.query.
-
-        Parameters
-        ----------
-        expr : str
-            A boolean expression.  Names in the expression refers to the
-            columns.
-
-        Returns
-        -------
-        filtered :  DataFrame
-        """
-        if "@" in expr:
-            raise NotImplementedError("Using variables from the calling " "environment")
-        # Empty calling environment
-        callenv = {"locals": {}, "globals": {}}
-        return self.map_partitions(query, expr, callenv, meta=self._meta)
-
     def merge(
         self,
         other,
@@ -169,7 +137,15 @@ class DataFrame(_Frame, dd.core.DataFrame):
     ):
         """Merging two dataframes on the column(s) indicated in *on*.
         """
-        if left_index or right_index:
+        if (
+            left_index
+            or right_index
+            or not dask.is_dask_collection(other)
+            or self.npartitions == 1
+            and how in ("inner", "right")
+            or other.npartitions == 1
+            and how in ("inner", "left")
+        ):
             return dd.merge(
                 self,
                 other,
@@ -178,17 +154,20 @@ class DataFrame(_Frame, dd.core.DataFrame):
                 left_index=left_index,
                 right_index=right_index,
             )
-        if on is None:
-            return self.join(other, how=how, lsuffix=suffixes[0], rsuffix=suffixes[1])
-        else:
-            return join_impl.join_frames(
-                left=self,
-                right=other,
-                on=on,
-                how=how,
-                lsuffix=suffixes[0],
-                rsuffix=suffixes[1],
-            )
+
+        if not on and not left_index and not right_index:
+            on = [c for c in self.columns if c in other.columns]
+            if not on:
+                left_index = right_index = True
+
+        return join_impl.join_frames(
+            left=self,
+            right=other,
+            on=on,
+            how=how,
+            lsuffix=suffixes[0],
+            rsuffix=suffixes[1],
+        )
 
     def join(self, other, how="left", lsuffix="", rsuffix=""):
         """Join two datatframes
@@ -529,7 +508,7 @@ class DataFrame(_Frame, dd.core.DataFrame):
 
 def sum_of_squares(x):
     x = x.astype("f8")._column
-    outcol = cudf._gdf.apply_reduce(libgdf.gdf_sum_squared_generic, x)
+    outcol = cpp_reduce.apply_reduce("sum_of_squares", x)
     return cudf.Series(outcol)
 
 

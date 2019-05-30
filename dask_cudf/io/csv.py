@@ -9,7 +9,7 @@ from dask.utils import parse_bytes
 from dask.dataframe.io.csv import make_reader
 
 import cudf
-from libgdf_cffi import GDFError
+from cudf.bindings.GDFError import GDFError
 
 
 def read_csv(path, chunksize="256 MiB", **kwargs):
@@ -34,7 +34,7 @@ def _internal_read_csv(path, chunksize="256 MiB", **kwargs):
     )  # TODO: get last modified time
 
     compression = kwargs.get("compression", False)
-    if compression:
+    if compression and chunksize:
         # compressed CSVs reading must read the entire file
         kwargs.pop("byte_range", None)
         warn(
@@ -47,8 +47,10 @@ def _internal_read_csv(path, chunksize="256 MiB", **kwargs):
 
     if chunksize is None:
         return read_csv_without_chunksize(path, **kwargs)
+    
+    dask_reader = make_reader(cudf.read_csv, "read_csv", "CSV")
+    meta = dask_reader(filenames[0], **kwargs)._meta
 
-    meta = cudf.read_csv(filenames[0], **kwargs)
     dsk = {}
     i = 0
     dtypes = meta.dtypes.values

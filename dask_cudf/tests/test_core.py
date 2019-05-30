@@ -4,7 +4,6 @@ import numpy as np
 import pandas as pd
 import pandas.util.testing as tm
 import pytest
-from pandas.util.testing import assert_frame_equal
 
 import cudf
 import dask_cudf as dgd
@@ -21,11 +20,11 @@ def test_from_cudf():
 
     # Test simple around to/from dask
     ingested = dd.from_pandas(gdf, npartitions=2)
-    assert_frame_equal(ingested.compute().to_pandas(), df)
+    dd.assert_eq(ingested, df)
 
     # Test conversion to dask.dataframe
     ddf = ingested.to_dask_dataframe()
-    assert_frame_equal(ddf.compute(), df)
+    dd.assert_eq(ddf, df)
 
 
 def test_from_cudf_with_generic_idx():
@@ -64,14 +63,30 @@ def test_query():
     gdf = cudf.DataFrame.from_pandas(df)
     expr = "x > 2"
 
-    assert_frame_equal(gdf.query(expr).to_pandas(), df.query(expr))
+    dd.assert_eq(gdf.query(expr), df.query(expr))
 
     queried = dd.from_pandas(gdf, npartitions=2).query(expr)
 
-    got = queried.compute().to_pandas()
-    expect = gdf.query(expr).to_pandas()
+    got = queried
+    expect = gdf.query(expr)
 
-    assert_frame_equal(got, expect)
+    dd.assert_eq(got, expect)
+
+
+def test_query_local_dict():
+    np.random.seed(0)
+    df = pd.DataFrame(
+        {"x": np.random.randint(0, 5, size=10), "y": np.random.normal(size=10)}
+    )
+    gdf = cudf.DataFrame.from_pandas(df)
+    ddf = dgd.from_cudf(gdf, npartitions=2)
+
+    val = 2
+
+    gdf_queried = gdf.query("x > @val")
+    ddf_queried = ddf.query("x > @val", local_dict={"val": val})
+
+    dd.assert_eq(gdf_queried, ddf_queried)
 
 
 def test_head():
@@ -82,7 +97,7 @@ def test_head():
     gdf = cudf.DataFrame.from_pandas(df)
     dgf = dd.from_pandas(gdf, npartitions=2)
 
-    assert_frame_equal(dgf.head().to_pandas(), df.head())
+    dd.assert_eq(dgf.head(), df.head())
 
 
 def test_from_dask_dataframe():
@@ -181,8 +196,8 @@ def test_assign():
     newcol = dd.from_pandas(cudf.Series(pdcol), npartitions=dgf.npartitions)
     out = dgf.assign(z=newcol)
 
-    got = out.compute().to_pandas()
-    assert_frame_equal(got.loc[:, ["x", "y"]], df)
+    got = out
+    dd.assert_eq(got.loc[:, ["x", "y"]], df)
     np.testing.assert_array_equal(got["z"], pdcol)
 
 
@@ -257,10 +272,12 @@ def test_repr(func):
         assert gddf._repr_html_()
 
 
-@pytest.mark.xfail(reason="datetime indexes not fully supported in cudf")
+@pytest.mark.skip(reason="datetime indexes not fully supported in cudf")
 @pytest.mark.parametrize("start", ["1d", "5d", "1w", "12h"])
 @pytest.mark.parametrize("stop", ["1d", "3d", "8h"])
 def test_repartition_timeseries(start, stop):
+    # This test is currently absurdly slow.  It should not be unskipped without
+    # slimming it down.
     pdf = dask.datasets.timeseries(
         "2000-01-01",
         "2000-01-31",
@@ -327,6 +344,14 @@ def gddf(gdf):
 def test_unary_ops(func, gdf, gddf):
     p = func(gdf)
     g = func(gddf)
+
+    # Fixed in https://github.com/dask/dask/pull/4657
+    if isinstance(p, cudf.Index):
+        from packaging import version
+        if version.parse(dask.__version__) < version.parse("1.1.6"):
+            pytest.skip("dask.dataframe assert_eq index check hardcoded to "
+                        "pandas prior to 1.1.6 release")
+
     dd.assert_eq(p, g, check_names=False)
 
 
@@ -343,3 +368,11 @@ def test_concat(gdf, gddf, series):
         .reset_index(drop=True)
     )
     dd.assert_eq(a, b)
+
+
+def test_boolean_index(gdf, gddf):
+
+    gdf2 = gdf[gdf.x > 2]
+    gddf2 = gddf[gddf.x > 2]
+
+    dd.assert_eq(gdf2, gddf2)

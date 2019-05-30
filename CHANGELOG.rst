@@ -1,3 +1,22 @@
+dask-cudf 0.7.0 (10 May 2019)
+-----------------------------
+
+-  Remove dependency on libgdf_cffi (#228) `Keith Kraus`_
+-  Update build process `Rick Ratzel`_
+-  Convert query to use standard dask query and update GPUCI to cudf 0.7 (#196) `Nick Becker`_
+-  Update GPU CI to use cudf 0.7 (#204) `Nick Becker`_
+-  Route single-partition merge cases through dask.dataframe (#194) `Matthew Rocklin`_
+-  Avoid compression warning in read_csv if chunksize=None (#192) `Matthew Rocklin`_
+-  Fix classifier (#182) `Ray Douglass`_
+-  Fix gpuCI build script (#173) `Dillon Cullinan`_
+
+
+0.6.1 - 2019-04-09
+------------------
+
+-  Add cudf.DataFrame.mean = None (#205) `Matthew Rocklin`_
+
+
 dask-cudf 0.6.0 (22 Mar 2019)
 -----------------------------
 
@@ -40,6 +59,7 @@ a few extra methods.
 -  Add pre-commit-config.yaml including black and flake8 `Matthew Rocklin`_
 -  Inherit from Dask Dataframe and respond to cudf update (#48) `Matthew Rocklin`_
 -  updating for new cuDF API `Matthew Jones`_
+-  add orc reader (#220) `Benjamin Zaitlen`_
 
 .. _`Matthew Jones`: https://github.com/mt-jones
 .. _`Keith Kraus`: https://github.com/kkraus14
@@ -47,3 +67,5 @@ a few extra methods.
 .. _`Matthew Rocklin`: https://github.com/mrocklin
 .. _`Benjamin Zaitlen`: https://github.com/quasiben
 .. _`Mike Wendt`: https://github.com/mike-wendt
+.. _`Dillon Cullinan`: https://github.com/dillon-cullinan
+.. _`Nick Becker`: https://github.com/beckernick
