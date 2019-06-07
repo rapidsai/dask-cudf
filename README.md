@@ -6,11 +6,11 @@ A partitioned gpu-backed dataframe, using Dask.
 
 Setup from source repo:
 
-1.  Install dependencies into a new conda environment
+1.  Install dependencies into a new conda environment where `CUDA_VERSION` is either 9.2 or 10
 
         conda create -n dask-cudf \
            -c rapidsai -c numba -c conda-forge -c defaults \
-           cudf dask cudatoolkit
+           cudf dask cudatoolkit={CUDA_VERSION}
 
 2.  Activate conda environment:
 
