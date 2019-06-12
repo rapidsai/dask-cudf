@@ -37,7 +37,7 @@ $CC --version
 $CXX --version
 
 logger "Setup new environment..."
-conda install -c rapidsai/label/cuda$CUDA_REL -c rapidsai-nightly/label/cuda$CUDA_REL -c nvidia/label/cuda$CUDA_REL -c conda-forge \
+conda install \
     'cudf=0.8*' \
     'pyarrow=0.12.1' \
     'dask>=1.1.5'
