@@ -33,15 +33,19 @@ def test_groupby(func, check_dtype):
 
     ddf = dask_cudf.from_cudf(gdf, npartitions=5)
 
-    a = func(gdf).to_pandas()
-    b = func(ddf).compute().to_pandas()
+    a = pd.DataFrame(func(gdf).to_pandas())
+    b = pd.DataFrame(func(ddf).compute().to_pandas())
 
     a.index.name = None
     a.name = None
     b.index.name = None
     b.name = None
 
-    dd.assert_eq(a, b, check_dtype=check_dtype)
+    dd.assert_eq(
+        a,
+        b,
+        check_dtype=check_dtype
+    )
 
 
 @pytest.mark.xfail(reason="cudf issues")
@@ -93,7 +97,7 @@ def test_groupby_multi_column(func):
 
     ddf = dask_cudf.from_cudf(gdf, npartitions=5)
 
-    a = func(gdf).to_pandas()
-    b = func(ddf).compute().to_pandas()
+    a = pd.DataFrame(func(gdf).to_pandas())
+    b = pd.DataFrame(func(ddf).compute().to_pandas())
 
     dd.assert_eq(a, b)
