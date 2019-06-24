@@ -8,21 +8,23 @@ import pytest
 
 
 @pytest.mark.parametrize(
-    "func",
+    "func,check_dtype",
     [
-        lambda df: df.groupby("x").sum(),
-        lambda df: df.groupby("x").mean(),
-        lambda df: df.groupby("x").count(),
-        lambda df: df.groupby("x").min(),
-        lambda df: df.groupby("x").max(),
-        lambda df: df.groupby("x").y.sum(),
-        lambda df: df.groupby("x").agg({"y": "max"}),
+        (lambda df: df.groupby("x").sum(), True),
+        (lambda df: df.groupby("x").mean(), True),
+        (lambda df: df.groupby("x").count(), False),
+        (lambda df: df.groupby("x").min(), True),
+        (lambda df: df.groupby("x").max(), True),
+        (lambda df: df.groupby("x").y.sum(), True),
+        (lambda df: df.groupby("x").agg({"y": "max"}), True),
         pytest.param(
-            lambda df: df.groupby("x").y.agg(["sum", "max"]), marks=pytest.mark.skip
+            lambda df: df.groupby("x").y.agg(["sum", "max"]),
+            True,
+            marks=pytest.mark.skip
         )
     ],
 )
-def test_groupby(func):
+def test_groupby(func, check_dtype):
     pdf = pd.DataFrame(
         {"x": np.random.randint(0, 5, size=10000), "y": np.random.normal(size=10000)}
     )
@@ -39,7 +41,7 @@ def test_groupby(func):
     b.index.name = None
     b.name = None
 
-    dd.assert_eq(a, b)
+    dd.assert_eq(a, b, check_dtype=check_dtype)
 
 
 @pytest.mark.xfail(reason="cudf issues")
