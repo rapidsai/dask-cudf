@@ -119,7 +119,6 @@ def test_mixing_series_frame_error():
         combined.compute()
 
     raises.match(r"^Metadata mismatch found in `from_delayed`.")
-    raises.match(r"Expected partition of type `DataFrame` but got `Series`")
 
 
 def test_frame_extra_columns_error():

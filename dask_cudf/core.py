@@ -1,6 +1,8 @@
 # Copyright (c) 2018, NVIDIA CORPORATION.
-
+import warnings
 from collections import OrderedDict
+
+import pandas as pd
 
 import dask
 import dask.dataframe as dd
@@ -11,11 +13,11 @@ from dask.compatibility import apply
 from dask.context import _globals
 from dask.core import flatten
 from dask.dataframe import from_delayed
-from dask.dataframe.core import Scalar
+from dask.dataframe.core import Scalar, handle_out, map_partitions
 from dask.dataframe.utils import raise_on_meta_error
 from dask.delayed import delayed
 from dask.optimization import cull, fuse
-from dask.utils import M, OperatorMethodMixin, funcname
+from dask.utils import M, OperatorMethodMixin, funcname, derived_from
 from toolz import partition_all
 
 import cudf
@@ -505,6 +507,29 @@ class DataFrame(_Frame, dd.core.DataFrame):
         shufidx = self._argsort(by)
         return self.take(shufidx)
 
+    @derived_from(pd.DataFrame)
+    def var(self, axis=None, skipna=True, ddof=1, split_every=False,
+            dtype=None, out=None):
+        axis = self._validate_axis(axis)
+        meta = self._meta_nonempty.var(axis=axis, skipna=skipna)
+        if axis == 1:
+            result = map_partitions(M.var, self, meta=meta,
+                                    token=self._token_prefix + 'var',
+                                    axis=axis, skipna=skipna, ddof=ddof)
+            return handle_out(out, result)
+
+        else:
+            num = self._get_numeric_data()
+            x = 1.0 * num.sum(skipna=skipna, split_every=split_every)
+            x2 = 1.0 * (num ** 2).sum(skipna=skipna, split_every=split_every)
+            n = num.count(split_every=split_every)
+            name = self._token_prefix + 'var'
+            result = map_partitions(var_aggregate, x2, x, n,
+                                    token=name, meta=meta, ddof=ddof)
+            if isinstance(self, DataFrame):
+                result.divisions = (min(self.columns), max(self.columns))
+            return handle_out(out, result)
+
 
 def sum_of_squares(x):
     x = x.astype("f8")._column
@@ -512,9 +537,11 @@ def sum_of_squares(x):
     return cudf.Series(outcol)
 
 
-def var_aggregate(x2, x, n, ddof=1):
+def var_aggregate(x2, x, n, ddof):
     try:
-        result = (x2 / n) - (x / n) ** 2
+        with warnings.catch_warnings(record=True):
+            warnings.simplefilter('always')
+            result = (x2 / n) - (x / n)**2
         if ddof != 0:
             result = result * n / (n - ddof)
         return result
@@ -557,6 +584,29 @@ class Series(_Frame, dd.core.Series):
             split_every=split_every,
             k=k,
         )
+
+    @derived_from(pd.DataFrame)
+    def var(self, axis=None, skipna=True, ddof=1, split_every=False, dtype=None, out=None):
+        axis = self._validate_axis(axis)
+        meta = self._meta_nonempty.var(axis=axis, skipna=skipna)
+        if axis == 1:
+            result = map_partitions(M.var, self, meta=meta,
+                                    token=self._token_prefix + 'var',
+                                    axis=axis, skipna=skipna, ddof=ddof)
+            return handle_out(out, result)
+
+        else:
+            num = self._get_numeric_data()
+            x = 1.0 * num.sum(skipna=skipna, split_every=split_every)
+            x2 = 1.0 * (num ** 2).sum(skipna=skipna, split_every=split_every)
+            n = num.count(split_every=split_every)
+            name = self._token_prefix + 'var'
+            result = map_partitions(var_aggregate, x2, x, n,
+                                    token=name, meta=meta, ddof=ddof)
+            if isinstance(self, DataFrame):
+                result.divisions = (min(self.columns), max(self.columns))
+            return handle_out(out, result)
+
 
     # ----------------------------------------------------------------------
     # Accessor Methods

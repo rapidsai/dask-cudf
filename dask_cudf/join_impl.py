@@ -46,6 +46,10 @@ def join_frames(left, right, on, how, lsuffix, rsuffix):
         Join method
     lsuffix, rsuffix : str
     """
+
+    if on:
+        on = [on] if isinstance(on, str) else list(on)
+
     empty_frame = left._meta.merge(
         right._meta, on=on, how=how, suffixes=(lsuffix, rsuffix)
     )

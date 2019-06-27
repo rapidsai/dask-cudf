@@ -37,8 +37,8 @@ $CC --version
 $CXX --version
 
 logger "Setup new environment..."
-conda install -c rapidsai/label/cuda$CUDA_REL -c rapidsai-nightly/label/cuda$CUDA_REL -c nvidia/label/cuda$CUDA_REL -c conda-forge \
-    'cudf=0.7*' \
+conda install \
+    'cudf=0.8*' \
     'pyarrow=0.12.1' \
     'dask>=1.1.5'
 pip install git+https://github.com/dask/dask.git --upgrade --no-deps
@@ -48,4 +48,6 @@ conda list
 logger "Python py.test for dask-cudf..."
 cd $WORKSPACE
 pip install -e .
-py.test dask_cudf/ --cache-clear --junitxml=${WORKSPACE}/junit-dask-cudf.xml -v
+
+py.test --cache-clear --junitxml=${WORKSPACE}/junit-dask-cudf.xml -v --cov-config=.coveragerc --cov=dask_cudf --cov-report=xml:${WORKSPACE}/dask-cudf-coverage.xml --cov-report term
+
